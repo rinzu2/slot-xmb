@@ -224,6 +224,18 @@ pub struct SlotState {
     pub wallpaper_tint: WallpaperTint,
     pub show_recents: bool,
     pub show_titles: bool,
+    /// Cross-media-bar background: 0 Original, 1 Classic, 2 the wallpaper.
+    pub xmb_wave: u8,
+    /// Cross-media-bar colour: 0 follows the month, 1.. picks one of the handheld's colours.
+    pub xmb_colour: u8,
+    /// Show only the game's label art in the cross-media bar, without the cartridge.
+    pub xmb_labels: bool,
+    /// The bar's clock: 24-hour rather than 12-hour.
+    pub xmb_clock24: bool,
+    /// How the bar writes dates: 0 month/day/year, 1 day/month/year, 2 year/month/day.
+    pub xmb_date_format: u8,
+    /// The bar shows the battery's charge as a number beside its icon.
+    pub xmb_battery_pct: bool,
     pub left_stick_dpad: bool,
     pub lid_off_min: Option<u8>,
     pub bezel_gba: BezelPick,
@@ -365,6 +377,12 @@ impl Default for SlotState {
             wallpaper_tint: WallpaperTint::Off,
             show_recents: false,
             show_titles: false,
+            xmb_wave: 0,
+            xmb_colour: 0,
+            xmb_labels: false,
+            xmb_clock24: false,
+            xmb_date_format: 0,
+            xmb_battery_pct: false,
             left_stick_dpad: true,
             lid_off_min: None,
             bezel_gba: BezelPick::Ags102,
@@ -460,6 +478,12 @@ pub fn write_slot_state(root: &Path, s: &SlotState) -> std::io::Result<()> {
     text.push_str(&format!("wallpaper_tint={}\n", s.wallpaper_tint.key()));
     text.push_str(&format!("show_recents={}\n", s.show_recents as u8));
     text.push_str(&format!("show_titles={}\n", s.show_titles as u8));
+    text.push_str(&format!("xmb_wave={}\n", s.xmb_wave));
+    text.push_str(&format!("xmb_colour={}\n", s.xmb_colour));
+    text.push_str(&format!("xmb_labels={}\n", s.xmb_labels as u8));
+    text.push_str(&format!("xmb_clock24={}\n", s.xmb_clock24 as u8));
+    text.push_str(&format!("xmb_date_format={}\n", s.xmb_date_format));
+    text.push_str(&format!("xmb_battery_pct={}\n", s.xmb_battery_pct as u8));
     text.push_str(&format!("left_stick_dpad={}\n", s.left_stick_dpad as u8));
     text.push_str(&format!("auto_load={}\n", s.auto_load as u8));
     if let Some(min) = s.lid_off_min {
@@ -514,6 +538,12 @@ fn parse(text: &str) -> Option<SlotState> {
     let mut wallpaper_tint = None;
     let mut show_recents = None;
     let mut show_titles = None;
+    let mut xmb_wave = None;
+    let mut xmb_colour = None;
+    let mut xmb_labels = None;
+    let mut xmb_clock24 = None;
+    let mut xmb_date_format = None;
+    let mut xmb_battery_pct = None;
     let mut left_stick_dpad = None;
     let mut lid_off_min = None;
     let mut bezel_gba = None;
@@ -555,6 +585,12 @@ fn parse(text: &str) -> Option<SlotState> {
             "wallpaper_tint" => wallpaper_tint = WallpaperTint::parse(value),
             "show_recents" => show_recents = flag(value),
             "show_titles" => show_titles = flag(value),
+            "xmb_wave" => xmb_wave = value.parse::<u8>().ok().filter(|v| *v <= 2),
+            "xmb_colour" => xmb_colour = value.parse::<u8>().ok().filter(|v| *v <= 64),
+            "xmb_labels" => xmb_labels = flag(value),
+            "xmb_clock24" => xmb_clock24 = flag(value),
+            "xmb_battery_pct" => xmb_battery_pct = flag(value),
+            "xmb_date_format" => xmb_date_format = value.parse::<u8>().ok().filter(|v| *v <= 2),
             "left_stick_dpad" => left_stick_dpad = flag(value),
             "lid_off_min" => lid_off_min = value.parse().ok().filter(|m| LID_OFF_MIN.contains(m)),
             "bezel_gba" => bezel_gba = Some(BezelPick::parse(value)),
@@ -607,6 +643,12 @@ fn parse(text: &str) -> Option<SlotState> {
         wallpaper_tint: wallpaper_tint.unwrap_or(fallback.wallpaper_tint),
         show_recents: show_recents.unwrap_or(fallback.show_recents),
         show_titles: show_titles.unwrap_or(fallback.show_titles),
+        xmb_wave: xmb_wave.unwrap_or(fallback.xmb_wave),
+        xmb_colour: xmb_colour.unwrap_or(fallback.xmb_colour),
+        xmb_labels: xmb_labels.unwrap_or(fallback.xmb_labels),
+        xmb_clock24: xmb_clock24.unwrap_or(fallback.xmb_clock24),
+        xmb_date_format: xmb_date_format.unwrap_or(fallback.xmb_date_format),
+        xmb_battery_pct: xmb_battery_pct.unwrap_or(fallback.xmb_battery_pct),
         left_stick_dpad: left_stick_dpad.unwrap_or(fallback.left_stick_dpad),
         lid_off_min,
         bezel_gba: bezel_gba.unwrap_or(fallback.bezel_gba),

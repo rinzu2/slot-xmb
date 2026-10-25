@@ -52,6 +52,8 @@ pub enum Draw {
         tex: TexId,
     },
     Capture,
+    /// The whole canvas, lit by `crate::backdrop`.
+    Backdrop(crate::backdrop::Backdrop),
 }
 
 pub struct Sprites {
@@ -112,6 +114,19 @@ impl Sprites {
 
     pub fn create_texture_nearest(&mut self, w: u32, h: u32, rgba: &[u8]) -> TexId {
         self.push(w, h, rgba, gl::NEAREST)
+    }
+
+    /// A texture drawn well below its size, eg an icon: filtered through mipmaps so it stays
+    /// smooth when small. `w` and `h` must be powers of two.
+    pub fn create_texture_mipmapped(&mut self, w: u32, h: u32, rgba: &[u8]) -> TexId {
+        let tex = crate::gl::texture(w, h, gl::LINEAR, gl::CLAMP_TO_EDGE, gl::RGBA, Some(rgba));
+        unsafe {
+            gl::BindTexture(gl::TEXTURE_2D, tex);
+            gl::GenerateMipmap(gl::TEXTURE_2D);
+            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR_MIPMAP_LINEAR as i32);
+        }
+        self.textures.push(tex);
+        TexId(self.textures.len() - 1)
     }
 
     fn push(&mut self, w: u32, h: u32, rgba: &[u8], filter: gl::types::GLenum) -> TexId {
@@ -194,7 +209,7 @@ impl Sprites {
                     Some(t) => (x, y, w, h, *t, [1.0, 1.0, 1.0, alpha], turn, whole),
                     None => continue,
                 },
-                Draw::Game | Draw::Shot { .. } | Draw::Capture => continue,
+                Draw::Game | Draw::Shot { .. } | Draw::Capture | Draw::Backdrop(_) => continue,
             };
             let (cos, sin) = if turn == 0.0 {
                 (1.0, 0.0)

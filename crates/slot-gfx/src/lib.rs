@@ -5,6 +5,7 @@ macro_rules! eprintln {
     }};
 }
 
+mod backdrop;
 mod bezel;
 mod draw;
 mod fbdev;
@@ -23,6 +24,12 @@ mod quad;
 mod shaders;
 mod surface;
 
+pub use backdrop::{
+    decode as backdrop_decode, encode as backdrop_encode, fragment_source as backdrop_fragment_source,
+    put as backdrop_put, shade as backdrop_shade, Backdrop, BackdropColours, BackdropEdges, BACKDROP_COLS, BACKDROP_PLAIN,
+    BACKDROP_ROWS, LINES as BACKDROP_LINES, ROW_EDGES, ROW_LINES, STYLE_CLASSIC,
+    STYLE_ORIGINAL,
+};
 pub use bezel::{framed, game_rect, lifted_rect, screen_rect};
 pub use draw::{Draw, TexId};
 pub use fbdev::{egl_error, panel_mode, panel_size, FbdevSurface};

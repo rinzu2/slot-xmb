@@ -21,6 +21,8 @@ use slot_ui::{
 };
 
 use crate::audio::Sfx;
+
+mod xmb;
 use crate::core_picker::{Chip, CorePicker, Outcome, Press};
 use crate::link_kind::{link_carried, link_dual, link_kind, serial_option, LinkKind};
 use crate::link_radio::{radio_jobs, LinkRole, RadioJob, RadioJobs};
@@ -317,6 +319,16 @@ impl Rack {
         }
     }
 
+    fn xmb_icon(self) -> slot_ui::XmbIcon {
+        match self {
+            Rack::Recents => slot_ui::XmbIcon::Recents,
+            Rack::Favorites => slot_ui::XmbIcon::Favorites,
+            Rack::Of(Platform::Gba) => slot_ui::XmbIcon::Gba,
+            Rack::Of(Platform::Gbc) => slot_ui::XmbIcon::Gbc,
+            Rack::Of(Platform::Gb) => slot_ui::XmbIcon::Gb,
+        }
+    }
+
     fn name(self) -> &'static str {
         match self {
             Rack::Recents => "Recents",
@@ -325,6 +337,9 @@ impl Rack {
         }
     }
 }
+
+/// Browse with the cross-media-bar layout instead of the cart carousel.
+pub const XMB: bool = cfg!(feature = "xmb");
 
 const RECENTS_AT: usize = 0;
 const FAVORITES_AT: usize = 1;
@@ -472,6 +487,28 @@ pub struct App {
     shot_opens: u64,
     shot_tick_face: Option<(TexId, u32, u32)>,
     delete_shot_text: Option<[(TexId, u32, u32); 2]>,
+    xmb_art: slot_ui::XmbArt,
+    xmb_texts: HashMap<String, slot_ui::XmbText>,
+    /// The bar's animated position: Settings at 0, then the non-empty shelves.
+    xmb_col: f32,
+    /// A strip of values open on a setting.
+    xmb_pick: Option<xmb::XmbPick>,
+    /// The option menu open on the selected game.
+    xmb_options: Option<xmb::XmbOptions>,
+    /// How far into a settings list the screen has moved, animated toward 0 or 1.
+    xmb_nest: f32,
+    /// The line selected in About.
+    xmb_about: usize,
+    /// When a button last did something, so the bar can slow down once left alone.
+    xmb_touched: Millis,
+    /// When the start-up animation began, and whether it has played out.
+    xmb_intro: Option<f64>,
+    /// How far into the animation this app took it over from the device.
+    xmb_handover: f32,
+    xmb_time_shift: f64,
+    xmb_intro_done: bool,
+    /// A sound the bar wants played, taken by the session.
+    xmb_sound: Option<crate::audio::XmbSound>,
 }
 
 const FACE_AHEAD: i32 = 8;
@@ -510,7 +547,7 @@ fn shift_down(draws: &mut [Draw], dy: f32) {
             | Draw::Tex { y, .. }
             | Draw::Part { y, .. }
             | Draw::Turned { y, .. } => *y += dy,
-            Draw::Game | Draw::Shot { .. } | Draw::Capture => {}
+            Draw::Game | Draw::Shot { .. } | Draw::Capture | Draw::Backdrop(_) => {}
         }
     }
 }
@@ -539,6 +576,19 @@ impl App {
             shot_opens: 0,
             shot_tick_face: None,
             delete_shot_text: None,
+            xmb_art: slot_ui::XmbArt::default(),
+            xmb_texts: HashMap::new(),
+            xmb_col: 0.0,
+            xmb_pick: None,
+            xmb_options: None,
+            xmb_nest: 0.0,
+            xmb_about: 0,
+            xmb_touched: 0,
+            xmb_intro: None,
+            xmb_handover: 0.0,
+            xmb_time_shift: 0.0,
+            xmb_intro_done: false,
+            xmb_sound: None,
             phase: Phase::Shelf,
             shelves,
             shelf_at,
@@ -637,7 +687,11 @@ impl App {
             slot_letter: None,
             shelf_named: None,
             shelf_clock: slot_ui::Printed::default(),
-            hud: Hud::new(),
+            hud: {
+                let mut hud = Hud::new();
+                hud.set_psp(XMB);
+                hud
+            },
             screen: 0.0,
             blank_s: 0.0,
             lift: 1.0,
@@ -959,9 +1013,7 @@ impl App {
         self.state.clock_set = true;
         self.persist();
         if from_menu {
-            self.phase = Phase::QuickMenu {
-                row: QuickRow::DateTime,
-            };
+            self.phase = Phase::QuickMenu { row: clock_row() };
         } else {
             self.start();
         }
@@ -1170,6 +1222,17 @@ impl App {
             } else {
                 QuickValue::Dark
             }),
+            QuickRow::XmbTheme
+            | QuickRow::XmbWave
+            | QuickRow::XmbColour
+            | QuickRow::XmbIcons
+            | QuickRow::XmbWallpaper
+            | QuickRow::XmbClock
+            | QuickRow::XmbSetClock
+            | QuickRow::XmbDateFormat
+            | QuickRow::XmbTimeFormat
+            | QuickRow::XmbTimeZone
+            | QuickRow::XmbBattery => None,
             QuickRow::DateTime
             | QuickRow::About
             | QuickRow::Screen
@@ -1445,6 +1508,24 @@ impl App {
         }
         if !self.state.turbo {
             hidden.extend([QuickRow::GameTurboA, QuickRow::GameTurboB]);
+        }
+        match XMB {
+            // The bar always shows titles and draws its own light-on-colour look; the wallpaper
+            // is a Theme Settings background and the clock has its own page.
+            true => {
+                hidden.extend([
+                    QuickRow::ShowTitles,
+                    QuickRow::Theme,
+                    QuickRow::Wallpaper,
+                    QuickRow::DateTime,
+                ]);
+                // A wallpaper takes the place of the colour; the waves have no wallpaper.
+                match self.state.xmb_wave {
+                    2 => hidden.push(QuickRow::XmbColour),
+                    _ => hidden.extend([QuickRow::XmbWallpaper, QuickRow::WallpaperTint]),
+                }
+            }
+            false => hidden.extend([QuickRow::XmbTheme, QuickRow::XmbClock, QuickRow::XmbBattery]),
         }
         hidden
     }
@@ -2260,6 +2341,7 @@ impl App {
     pub fn status_ink(&self) -> [u8; 3] {
         match self.phase {
             Phase::Playing { .. } | Phase::Polaroids { .. } => footer_ink(false),
+            _ if XMB => footer_ink(false),
             _ => footer_ink(self.light()),
         }
     }
@@ -2450,6 +2532,19 @@ impl App {
     }
 
     pub fn apply(&mut self, action: Action) {
+        self.xmb_touched = self.now();
+        if !XMB {
+            return self.apply_action(action);
+        }
+        if self.xmb_intro_skip(action) {
+            return;
+        }
+        let before = self.xmb_signature();
+        self.apply_action(action);
+        self.xmb_sound_for(action, before);
+    }
+
+    fn apply_action(&mut self, action: Action) {
         self.track_held_dir(action);
         match action {
             Action::LidClose => return self.doze(),
@@ -2475,6 +2570,8 @@ impl App {
         } = &mut self.phase
         {
             match action {
+                Action::GbaDown(Btn::Left) | Action::ShelfLeft if XMB => self.xmb_clock_move(-1),
+                Action::GbaDown(Btn::Right) | Action::ShelfRight if XMB => self.xmb_clock_move(1),
                 Action::GbaDown(Btn::Left) | Action::ShelfLeft => picker.left(),
                 Action::GbaDown(Btn::Right) | Action::ShelfRight => picker.right(),
                 Action::GbaDown(Btn::Up) => picker.up(),
@@ -2482,7 +2579,7 @@ impl App {
                 Action::GbaDown(Btn::A) | Action::Insert => self.confirm_clock(),
                 Action::GbaDown(Btn::B) if *from_menu => {
                     self.phase = Phase::QuickMenu {
-                        row: QuickRow::DateTime,
+                        row: clock_row(),
                     }
                 }
                 _ => {}
@@ -2536,19 +2633,32 @@ impl App {
         }
         if let (Some(row), Phase::Playing { .. }) = (self.in_game_menu, &self.phase) {
             if action != Action::Eject {
+                if XMB {
+                    return self.xmb_in_game_input(row, action);
+                }
                 return self.in_game_menu_input(row, action);
             }
         }
         let now = self.now();
         match self.phase {
             Phase::Shelf => match action {
+                _ if XMB && self.xmb_options.is_some() => self.xmb_options_input(action),
+                Action::GbaDown(Btn::Start) if XMB => self.xmb_open_options(),
                 Action::GbaDown(Btn::Start) if self.core_picker.is_none() => {
                     self.open_core_picker()
                 }
                 _ if self.core_picker.is_some() => self.core_picker_input(action),
+                // Cross-media bar: left and right walk the categories (Settings is leftmost),
+                // up and down the games, and the carousel's shoulder keys jump a letter.
+                Action::PreviousShelf | Action::GbaDown(Btn::Left) if XMB => self.xmb_step(-1),
+                Action::NextShelf | Action::GbaDown(Btn::Right) if XMB => self.xmb_step(1),
                 Action::PreviousShelf => self.switch_shelf(-1),
                 Action::NextShelf => self.switch_shelf(1),
                 Action::Favorite => self.toggle_favorite(),
+                Action::GbaDown(Btn::Up) if XMB => self.shelf_mut().left(),
+                Action::GbaDown(Btn::Down) if XMB => self.shelf_mut().right(),
+                Action::ShelfLeft if XMB => self.jump_letter(-1),
+                Action::ShelfRight if XMB => self.jump_letter(1),
                 Action::GbaDown(Btn::Up) => self.jump_letter(-1),
                 Action::GbaDown(Btn::Down) => self.jump_letter(1),
                 Action::ShelfLeft | Action::GbaDown(Btn::Left) => self.shelf_mut().hold_left(now),
@@ -2603,18 +2713,33 @@ impl App {
                 }
                 _ => {}
             },
-            Phase::About if action == Action::GbaDown(Btn::B) || action == Action::QuickMenu => {
+            Phase::About if XMB && action == Action::QuickMenu => self.xmb_leave_settings(),
+            Phase::About if XMB && action == Action::GbaDown(Btn::Up) => {
+                self.xmb_about = self.xmb_about.saturating_sub(1);
+            }
+            Phase::About if XMB && action == Action::GbaDown(Btn::Down) => {
+                let last = self.xmb_about_rows().len().saturating_sub(1);
+                self.xmb_about = (self.xmb_about + 1).min(last);
+            }
+            Phase::About
+                if action == Action::GbaDown(Btn::B)
+                    || action == Action::QuickMenu
+                    || (XMB && action == Action::GbaDown(Btn::Left)) =>
+            {
                 self.phase = Phase::QuickMenu {
                     row: QuickRow::About,
                 }
             }
             Phase::About if action == Action::GbaDown(Btn::X) => self.begin_restart(),
+            Phase::QuickMenu { row } if XMB => self.xmb_quick_input(row, action),
             Phase::QuickMenu { row } => self.quick_menu_input(row, action),
             _ => {}
         }
     }
 
     fn open_quick_menu(&mut self) {
+        self.xmb_pick = None;
+        self.xmb_options = None;
         self.phase = Phase::QuickMenu {
             row: QuickRow::MAIN[0],
         };
@@ -2698,6 +2823,7 @@ impl App {
     }
 
     fn tap_in_game_menu(&mut self, to: Option<QuickRow>) {
+        self.xmb_pick = None;
         if to.is_some() && self.in_game_menu.is_none() {
             self.refresh_albums();
             self.hud.hush();
@@ -2737,10 +2863,20 @@ impl App {
 
     fn open_quick_row(&mut self, row: QuickRow) {
         match row {
-            QuickRow::DateTime => {
+            QuickRow::DateTime | QuickRow::XmbSetClock => {
                 self.phase = clock_screen(self.utc_secs(), self.state.utc_offset_min, true);
+                if XMB {
+                    // The cursor starts on whichever field the date format reads first.
+                    let first = self.xmb_clock_fields()[0];
+                    if let Phase::SetClock { picker, .. } = &mut self.phase {
+                        picker.field(first);
+                    }
+                }
             }
-            QuickRow::About => self.phase = Phase::About,
+            QuickRow::About => {
+                self.xmb_about = 0;
+                self.phase = Phase::About;
+            }
             QuickRow::Screen
             | QuickRow::ScreenGeneral
             | QuickRow::Game
@@ -2749,6 +2885,8 @@ impl App {
             | QuickRow::ScreenGb
             | QuickRow::Shortcuts
             | QuickRow::General
+            | QuickRow::XmbTheme
+            | QuickRow::XmbClock
             | QuickRow::Controls
             | QuickRow::ControlsShelf
             | QuickRow::ControlsInGame => {
@@ -2827,12 +2965,70 @@ impl App {
             | QuickRow::ScShaderBack
             | QuickRow::ScFastForward
             | QuickRow::ScRewind
+            | QuickRow::XmbWave
+            | QuickRow::XmbColour
+            | QuickRow::XmbIcons
+            | QuickRow::XmbWallpaper
+            | QuickRow::XmbDateFormat
+            | QuickRow::XmbTimeFormat
+            | QuickRow::XmbTimeZone
+            | QuickRow::XmbBattery
             | QuickRow::LidOff => {}
         }
     }
 
     fn change_setting(&mut self, row: QuickRow, right: bool) {
         let row = self.playing_row(row);
+        match row {
+            QuickRow::XmbWave => {
+                // Original, Classic, then the wallpaper.
+                self.state.xmb_wave = match right {
+                    true => (self.state.xmb_wave.min(2) + 1) % 3,
+                    false => (self.state.xmb_wave.min(2) + 2) % 3,
+                };
+                return self.persist();
+            }
+            QuickRow::XmbDateFormat => {
+                self.state.xmb_date_format = match right {
+                    true => (self.state.xmb_date_format.min(2) + 1) % 3,
+                    false => (self.state.xmb_date_format.min(2) + 2) % 3,
+                };
+                return self.persist();
+            }
+            QuickRow::XmbTimeFormat => {
+                self.state.xmb_clock24 = !self.state.xmb_clock24;
+                return self.persist();
+            }
+            QuickRow::XmbBattery => {
+                self.state.xmb_battery_pct = !self.state.xmb_battery_pct;
+                return self.persist();
+            }
+            QuickRow::XmbTimeZone => {
+                let step = if right { 30 } else { -30 };
+                self.state.utc_offset_min = (self.state.utc_offset_min + step)
+                    .clamp(slot_store::UTC_OFFSET_MIN, slot_store::UTC_OFFSET_MAX);
+                return self.persist();
+            }
+            QuickRow::XmbWallpaper => {
+                self.cycle_wallpaper(right);
+                return self.persist();
+            }
+            QuickRow::XmbColour => {
+                // Monthly, then the twelve colours in calendar order.
+                // By Month, then each colour in the picker's order.
+                let n = slot_ui::XMB_COLOUR_COUNT as u8 + 1;
+                self.state.xmb_colour = match right {
+                    true => (self.state.xmb_colour + 1) % n,
+                    false => (self.state.xmb_colour + n - 1) % n,
+                };
+                return self.persist();
+            }
+            QuickRow::XmbIcons => {
+                self.state.xmb_labels = !self.state.xmb_labels;
+                return self.persist();
+            }
+            _ => {}
+        }
         if let QuickRow::Brightness | QuickRow::BlueLight = row {
             let (kind, now, max) = match row {
                 QuickRow::Brightness => {
@@ -3021,6 +3217,17 @@ impl App {
             | QuickRow::Controls
             | QuickRow::ControlsShelf
             | QuickRow::ControlsInGame
+            | QuickRow::XmbTheme
+            | QuickRow::XmbWave
+            | QuickRow::XmbColour
+            | QuickRow::XmbIcons
+            | QuickRow::XmbWallpaper
+            | QuickRow::XmbClock
+            | QuickRow::XmbSetClock
+            | QuickRow::XmbDateFormat
+            | QuickRow::XmbTimeFormat
+            | QuickRow::XmbTimeZone
+            | QuickRow::XmbBattery
             | QuickRow::LidOff => return,
         }
         self.persist();
@@ -3280,6 +3487,18 @@ impl App {
         if !self.on_shelf() {
             self.shelf_mut().release_hold();
         }
+        if XMB {
+            let target = self.xmb_target();
+            self.xmb_col += (target - self.xmb_col) * (1.0 - (-dt * 14.0).exp());
+            if (target - self.xmb_col).abs() < 0.001 {
+                self.xmb_col = target;
+            }
+            let nest = self.xmb_nest_target();
+            self.xmb_nest += (nest - self.xmb_nest) * (1.0 - (-dt * 12.0).exp());
+            if (nest - self.xmb_nest).abs() < 0.001 {
+                self.xmb_nest = nest;
+            }
+        }
         let mut touched = false;
         let at = self.shelf_at;
         let next = match &mut self.phase {
@@ -3314,7 +3533,8 @@ impl App {
             }
             _ => None,
         };
-        if touched {
+        // The bar starts and stops games without a cartridge, so without its sounds.
+        if touched && !XMB {
             self.sfx = Some(match self.phase {
                 Phase::Ejecting { .. } => Sfx::Eject,
                 _ => Sfx::Insert,
@@ -3557,6 +3777,7 @@ impl App {
     }
 
     fn timers(&mut self) {
+        self.xmb_intro_tick();
         self.play_hold();
         self.repeat_held_dir();
         self.take_shot_list();
@@ -3868,6 +4089,14 @@ impl App {
     }
 
     pub fn draw(&self, out: &mut Vec<Draw>) {
+        if XMB && (self.powering_off || self.restarting) {
+            return self.xmb_draw_outro(out);
+        }
+        if XMB && self.xmb_intro_active() {
+            if let Some(s) = self.xmb_intro_secs() {
+                return self.xmb_draw_intro(s, out);
+            }
+        }
         if self.shutting_down() {
             out.push(Draw::Rect {
                 x: 0.0,
@@ -3916,6 +4145,9 @@ impl App {
             };
         }
         match &self.phase {
+            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. } if XMB => {
+                self.draw_xmb(1.0, out);
+            }
             Phase::SetClock {
                 picker, from_menu, ..
             } => {
@@ -3997,6 +4229,30 @@ impl App {
                 self.draw_menu_footer(out);
                 return;
             }
+            // No cartridge or slot: the bar fades to black and the game comes up out of it.
+            Phase::Inserting { resumed, .. } if XMB => {
+                let black = match resumed {
+                    true => 1.0,
+                    false => {
+                        self.draw_xmb(1.0 - self.seat(), out);
+                        self.seat()
+                    }
+                };
+                self.xmb_black(black, out);
+            }
+            Phase::Ejecting { .. } if XMB => {
+                if self.shows_game() || self.screen > 0.0 {
+                    self.xmb_black(1.0, out);
+                    self.push_game(out);
+                } else {
+                    self.draw_xmb(1.0 - self.seat(), out);
+                    self.xmb_black(self.seat(), out);
+                }
+            }
+            Phase::Playing { .. } if XMB && self.screen < 1.0 => {
+                self.xmb_black(1.0, out);
+                self.push_game(out);
+            }
             Phase::Inserting { .. } if self.powering_up() && self.framed_panel() => {
                 self.draw_powering(out)
             }
@@ -4076,7 +4332,11 @@ impl App {
         if self.shot_wanted && matches!(self.phase, Phase::Playing { .. }) && self.game_visible() {
             out.push(Draw::Capture);
         }
-        if let (Some(row), Phase::Playing { .. }, true) =
+        if let (Some(row), Phase::Playing { .. }, true, true) =
+            (self.in_game_menu_shown(), &self.phase, self.screen >= 1.0, XMB)
+        {
+            self.draw_xmb_in_game(row, out);
+        } else if let (Some(row), Phase::Playing { .. }, true) =
             (self.in_game_menu_shown(), &self.phase, self.screen >= 1.0)
         {
             let hidden = self.in_game_hidden();
@@ -4113,8 +4373,10 @@ impl App {
                 );
             }
         }
-        self.draw_menu_footer(out);
-        self.draw_close_footer(out);
+        if !XMB || matches!(self.phase, Phase::Polaroids { .. }) {
+            self.draw_menu_footer(out);
+            self.draw_close_footer(out);
+        }
         if let Some(picker) = self.core_picker_shown() {
             self.draw_core_picker(&picker, out);
         }
@@ -4951,7 +5213,7 @@ impl App {
         }
         self.remember_shelf();
         self.restarting = true;
-        self.act_at = self.now() + SHUTDOWN_SHOW_MS;
+        self.act_at = self.now() + self.shutdown_show_ms();
         self.set_led(LedState::Off);
     }
 
@@ -5313,7 +5575,7 @@ impl App {
         self.close_game_menu();
         self.remember_shelf();
         self.powering_off = true;
-        self.act_at = self.now() + SHUTDOWN_SHOW_MS;
+        self.act_at = self.now() + self.shutdown_show_ms();
         self.set_led(LedState::Off);
     }
 
@@ -6015,6 +6277,14 @@ fn ff_next(from: u8, right: bool) -> u8 {
     } else {
         (at + n - 1) % n
     }]
+}
+
+/// The settings row the clock is set from.
+fn clock_row() -> QuickRow {
+    match XMB {
+        true => QuickRow::XmbSetClock,
+        false => QuickRow::DateTime,
+    }
 }
 
 fn clock_screen(utc: i64, offset_min: i16, from_menu: bool) -> Phase {

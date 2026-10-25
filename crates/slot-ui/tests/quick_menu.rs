@@ -80,7 +80,15 @@ fn the_fast_forward_row_offers_off_and_the_four_ceilings_the_card_can_hold() {
 fn the_rows_run_in_the_order_the_user_chose() {
     assert_eq!(
         QuickRow::MAIN.map(QuickRow::label),
-        ["General", "Screen", "Gameplay", "Controls", "About"]
+        [
+            "General",
+            "Screen",
+            "Gameplay",
+            "Controls",
+            "Theme Settings",
+            "Date & Time Settings",
+            "About"
+        ]
     );
     assert_eq!(
         QuickRow::GENERAL.map(QuickRow::label),
@@ -91,6 +99,7 @@ fn the_rows_run_in_the_order_the_user_chose() {
             "Recents",
             "Game Titles",
             "Lid Power Off",
+            "Battery Percentage",
             "Date & Time"
         ]
     );
@@ -161,7 +170,10 @@ fn the_rows_run_in_the_order_the_user_chose() {
             QuickRow::ControlsInGame,
             QuickRow::ScreenGeneral,
             QuickRow::UndoSave,
-            QuickRow::UndoLoad
+            QuickRow::UndoLoad,
+            QuickRow::XmbTheme,
+            QuickRow::XmbClock,
+            QuickRow::XmbSetClock
         ]
     );
     for page in [

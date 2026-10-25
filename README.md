@@ -1,84 +1,129 @@
 <div align="center">
 
-<img src=".github/resources/banner.png" width="100%" alt="slot. A bespoke, Game Boy-centric frontend for the Anbernic RG SP.">
+<h1>slot. XMB</h1>
 
-<a href="LICENSE"><img src="https://img.shields.io/github/license/BrandonKowalski/slot?style=for-the-badge&labelColor=242429&color=4d4d57" height="36" alt="License"></a>
-<a href="https://github.com/BrandonKowalski/slot/stargazers"><img src="https://img.shields.io/github/stars/BrandonKowalski/slot?style=for-the-badge&labelColor=242429&color=4d4d57" height="36" alt="Stars"></a>
-<a href="https://github.com/BrandonKowalski/slot/releases"><img src="https://img.shields.io/github/downloads/BrandonKowalski/slot/total?style=for-the-badge&labelColor=242429&color=4d4d57" height="36" alt="Downloads"></a>
-<a href="https://slot-cfw.fyi"><img src="https://img.shields.io/badge/Guide-slot--cfw.fyi-4d4d57?style=for-the-badge&labelColor=242429" height="36" alt="Guide"></a>
-<a href="CHANGELOG.md"><img src="https://img.shields.io/badge/Changelog-4d4d57?style=for-the-badge&labelColor=242429" height="36" alt="Changelog"></a>
+<p><b>A PSP-style XrossMediaBar skin for <a href="https://github.com/BrandonKowalski/slot">slot</a>, the Game Boy-centric frontend for the Anbernic RG SP.</b></p>
+
+<p>slot is made by <a href="https://github.com/BrandonKowalski">Brandon Kowalski</a>. All of the emulation, saves, link play and everything else under the skin is his work.</p>
+
+<img src=".github/resources/xmb/startup.gif" width="72%" alt="Powering on: the boot picture, the lines, the colour opening out and the bar fading in">
 
 </div>
 
 ---
 
-# What is slot?
+> [!NOTE]
+> This is an unofficial fork. It isn't affiliated with Sony or with the upstream slot project. Bugs in the XMB skin belong here, not upstream.
 
-A bespoke, Game Boy-centric frontend for the Anbernic RG SP.
+# What is this?
 
-Has support for GBA, GBC, and GB titles only.
+[slot](https://github.com/BrandonKowalski/slot) by Brandon Kowalski is a frontend for the Anbernic RG SP that plays GBA, GBC and GB games. This fork keeps slot's emulation, save handling, link play and settings, and replaces its menus with a PSP-style bar.
 
-> [!IMPORTANT]
-> ROMs must be unzipped. slot does not read `.zip` or `.7z` files.
-
-A full user guide can be found at [slot-cfw.fyi](https://slot-cfw.fyi).
-
-Release notes can be found in the [changelog](CHANGELOG.md).
-
----
+Everything here is built behind a `xmb` cargo feature. Without that feature, slot builds and behaves exactly like upstream.
 
 # What does it look like?
 
 <p align="center">
-<img src=".github/resources/screenshots/carousel.gif" width="48%" alt="Scrolling the cart carousel across the Game Boy Advance, Game Boy and Game Boy Color shelves">
-<img src=".github/resources/screenshots/core-picker.gif" width="48%" alt="Flipping a cart to its circuit board to choose mGBA or gpSP">
+<img src=".github/resources/xmb/01_home_gba.png" width="48%" alt="The Game Boy Advance column with game covers">
+<img src=".github/resources/xmb/12_gb_labels.png" width="48%" alt="The Game Boy column on a pale pink colour">
 </p>
-
 <p align="center">
-<img src=".github/resources/screenshots/link.gif" width="96.5%" alt="Two SPs racing in Mario Kart over the emulated link">
+<img src=".github/resources/xmb/07_classic_labels.png" width="48%" alt="Labels instead of cartridges, on a magenta colour">
+<img src=".github/resources/xmb/21_about.png" width="48%" alt="The About page">
+</p>
+<p align="center">
+<img src=".github/resources/xmb/03_settings.png" width="48%" alt="The Settings column">
+<img src=".github/resources/xmb/05_colour_picker.png" width="48%" alt="Picking a colour in Theme Settings">
+</p>
+<p align="center">
+<img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge">
+<img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu">
+</p>
+<p align="center">
+<img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings">
+<img src=".github/resources/xmb/boot.png" width="48%" alt="The boot picture">
 </p>
 
----
+# What's different
 
-# Supported Devices
+**The bar**
 
-| Device             | Supported                                    | Since Version |
-|--------------------|----------------------------------------------|---------------|
-| Anbernic RG SP     | Yes                                          | Always        |
-| Anbernic RG34XX    | Yes                                          | 1.4.0         |
-| Anbernic RG34XXSP  | Yes                                          | 1.4.0         |
-| Anbernic RG35XXSP  | Yes                                          | 1.5.0         |
-| Anbernic 35XX Plus | Yes                                          | 1.5.0         |
-| Anbernic RG28XX    | Yes                                          | 1.6.0         |
-| Anbernic RG35XX-H  | Yes                                          | 1.7.0         |
+- Categories run across the screen and items run down it, with the PSP's sizes, spacing, highlight glow and the small arrow beside an open item.
+- Game names show only on the game under the cursor.
+- The clock and battery sit at the top right and hide whenever a side menu is open. A battery percentage can be shown next to the battery icon.
 
-If you have one of the untested devices, or have tried slot on a device not listed,
-please [open an issue on GitHub](https://github.com/BrandonKowalski/slot/issues) and let me know how it went.
+**Waves and colours**
 
----
+- **Original** and **Classic** wave backgrounds, both drawn on the GPU.
+- 34 background colours fitted from screenshots of a real PSP, each with its own edge glow and shading. There's also a By Month option that changes the colour each month.
+- A **Wallpaper** background replaces the waves with your own picture.
 
-# AI Disclosure
+**Start-up and switch-off**
 
-The Rust frontend, and the SVGs on [slot-cfw.fyi](https://slot-cfw.fyi), were put together by Claude.
-I reviewed everything that was produced. All documentation is 100% free-range, meatbag prose.
+- On power-up the screen shows a boot picture that reads "slot. XMB".
+- The start-up animation takes over from that picture without a jump. The lines brighten, colour spreads out from them, and the waves grow out of them.
+- Games and settings load while the animation plays. If loading takes longer, the waves stay up with a pulsing ring at the lower left.
+- Switching off plays the animation in reverse.
+- Booting straight back into a game you left running skips the animation and goes from the boot picture to the game.
 
-My goal with this project was to recreate the feeling of playing my GBA SP in the back seat as a kid,
-but with a few modern creature comforts.
+**Settings**
 
-Nothing about this project is exciting or groundbreaking from a technological perspective, and as a
-result, I delegated the glue code. mGBA and gpSP have been around forever and are the true stars of
-this show. The incredible skeuomorphic art is the work of [Markus](https://github.com/MarkusMaribu), an
-artist who saw the bare-bones version and offered to dress it up.
+- Theme Settings: Background, Color (or Wallpaper), and Game Icons.
+- Date & Time Settings: a PSP-style clock editor, date format, 12- or 24-hour time, and time zone.
+- Volume, brightness and screen-temperature gauges in the PSP's style.
+- About sits at the bottom of Settings and scrolls.
 
-I understand if my use of AI is a dealbreaker for you. Just know it's the least interesting part of
-what's here.
+**Power use**
 
-Figured I should share the end result of all the wasted water. ✌🏻
+- When nothing is moving on the home screen, the bar draws at 20 frames per second instead of 60, so the device runs cooler.
 
----
+# Install
 
-# Spread Joy!
+1. Install upstream slot as described in the [slot guide](https://slot-cfw.fyi).
+2. Download `slot-xmb-rgsp.zip` from this fork's [releases](../../releases).
+3. Copy its `System/slot` over the one on your SD card.
 
-I've spent a lot of time building slot.
+The boot picture is written to the device the first time the new build runs. It shows from the following boot onwards.
 
-If you enjoy using it and feel inclined to pay it forward, go do something nice for someone! ❤️
+## Sounds (optional)
+
+The bar plays short sound effects if it finds them on the SD card. **They aren't included in this repo**, so you need to supply your own. Each must be a 16-bit PCM WAV, at any sample rate, mono or stereo.
+
+| File | Plays when |
+| --- | --- |
+| `System/sounds/opening.wav` | the start-up animation runs |
+| `System/sounds/cursor.wav` | you move the selection |
+| `System/sounds/confirm.wav` | you open or choose something |
+| `System/sounds/cancel.wav` | you back out |
+| `System/sounds/start.wav` | the device boots straight back into a game |
+
+If a file is missing, that sound is simply silent.
+
+# Build
+
+These are the same steps as upstream, with the `xmb` feature on:
+
+```sh
+cargo build --profile device --target aarch64-unknown-linux-gnu \
+  -p slot --no-default-features --features device,xmb
+```
+
+The XMB screenshots in this README come from a software-rendered test:
+
+```sh
+XMB_SHOTS=shots cargo test --release -p slot \
+  --no-default-features --features device,xmb --test xmb_shots
+```
+
+# Credits
+
+- **[slot](https://github.com/BrandonKowalski/slot) by [Brandon Kowalski](https://github.com/BrandonKowalski).** This fork is built on slot v1.9.0 and wouldn't exist without it. Read the [slot guide](https://slot-cfw.fyi) and the [upstream changelog](https://github.com/BrandonKowalski/slot/blob/main/CHANGELOG.md), and if you enjoy slot, you can [support Brandon on Ko-fi](https://ko-fi.com/kwallbmoc).
+- [BaseOS](https://github.com/pvaibhav/BaseOS), the system slot runs on.
+- Fonts: [Saira](https://github.com/Omnibus-Type/Saira) and [Montserrat](https://github.com/JulietaUla/Montserrat), both under the SIL Open Font License.
+- The look is modelled on Sony's PSP XrossMediaBar. PlayStation, PSP and XrossMediaBar are trademarks of Sony. This fork contains no Sony code, artwork or audio.
+
+# License
+
+GPL-3.0, the same as upstream. See [LICENSE](LICENSE).
+
+slot is the work of Brandon Kowalski. This fork modifies slot v1.9.0 (commit `20703ed`): the changes, made in October 2026, add the `xmb` feature and its art, fonts, animation and settings. The full history of both is in this repository's commits.

@@ -37,6 +37,7 @@ pub struct Session {
     prefetch: Prefetch,
     reloading: bool,
     driven: bool,
+    xmb_sounds: crate::audio::XmbSounds,
 }
 
 impl Session {
@@ -47,6 +48,10 @@ impl Session {
     pub fn boot_with(root: PathBuf, sink: Box<dyn AudioSink>) -> Self {
         let mut session = Session {
             app: App::boot(&root),
+            xmb_sounds: match crate::app::XMB {
+                true => crate::audio::XmbSounds::load(&root),
+                false => crate::audio::XmbSounds::default(),
+            },
             root,
             emu: None,
             opening: None,
@@ -67,7 +72,11 @@ impl Session {
         // A game left running comes straight back. Its core loads on its own thread, so start it
         // now and let the card read overlap the rest of the boot. Waiting for the first update
         // left a cold boot (after a power off) idle on the slot for the whole load.
+        // With the bar, it is heralded at once, while the game loads behind the boot picture.
         if session.inserting() {
+            if crate::app::XMB {
+                session.play_xmb_sound(crate::audio::XmbSound::Start);
+            }
             session.sync_core();
         }
         session
@@ -80,6 +89,17 @@ impl Session {
             return;
         }
         let mut samples = sfx.render(rate);
+        crate::audio::volume::apply(&mut samples, self.app.output_volume());
+        ring.mix(&samples);
+    }
+
+    pub fn play_xmb_sound(&mut self, sound: crate::audio::XmbSound) {
+        let ring = self.sink.ring();
+        let rate = ring.sample_rate();
+        if rate == 0 || !self.xmb_sounds.has(sound) {
+            return;
+        }
+        let mut samples = self.xmb_sounds.render(sound, rate);
         crate::audio::volume::apply(&mut samples, self.app.output_volume());
         ring.mix(&samples);
     }
@@ -330,6 +350,9 @@ impl Session {
         }
         if let Some(sfx) = self.app.take_sfx() {
             self.play_sfx(sfx);
+        }
+        if let Some(sound) = self.app.take_xmb_sound() {
+            self.play_xmb_sound(sound);
         }
         self.sync_core();
         self.sync_reload();

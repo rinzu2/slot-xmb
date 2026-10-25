@@ -9,6 +9,8 @@ license.workspace = true
 default = ["host"]
 host = ["dep:winit", "dep:cpal", "dep:gilrs", "slot-gfx/host"]
 device = ["slot-gfx/device"]
+# Browse with a cross-media-bar layout (systems across, games down) instead of the cart carousel.
+xmb = []
 
 [dependencies]
 slot-gfx = { path = "../slot-gfx", default-features = false }

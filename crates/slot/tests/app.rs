@@ -591,7 +591,7 @@ fn a_cart_in_flight_is_not_also_left_standing_on_the_shelf() {
                     && w <= CART_W as f32 + 0.01
                     && (w / h - CART_W as f32 / CART_H as f32).abs() < 0.05
             }
-            Draw::Game | Draw::Shot { .. } | Draw::Capture => false,
+            Draw::Game | Draw::Shot { .. } | Draw::Capture | Draw::Backdrop(_) => false,
         })
         .count();
     assert_eq!(
@@ -744,7 +744,8 @@ fn both_b_and_menu_take_the_about_screen_back_to_the_quick_menu() {
     ] {
         let (mut s, _motor) = common::session_with_platform(d.path());
         s.app_mut().apply(slot_input::Action::QuickMenu);
-        for _ in 0..slot_ui::QuickRow::About.position(&[]) {
+        let hidden = s.app().hidden_rows();
+        for _ in 0..slot_ui::QuickRow::About.position(&hidden) {
             s.app_mut()
                 .apply(slot_input::Action::GbaDown(slot_input::Btn::Down));
         }

@@ -124,6 +124,55 @@ pub fn haloed_with(
     }
 }
 
+/// An icon in the bar's style: solid, with a soft shadow below and to the right instead of a
+/// dark outline. The same size as `icon_face`, so it drops in wherever that is drawn.
+pub fn icon_face_soft(icon: Icon, px: f32, colour: [u8; 3]) -> CartFace {
+    let Some(r) = raster(icon, px) else {
+        return CartFace {
+            rgba: Vec::new(),
+            w: 0,
+            h: 0,
+        };
+    };
+    let pad = HALO_PX as isize;
+    let (cw, ch) = (r.w as isize, r.h as isize);
+    let (w, h) = (cw + 2 * pad, ch + 2 * pad);
+    let at = |x: isize, y: isize| -> f32 {
+        if x < 0 || y < 0 || x >= cw || y >= ch {
+            0.0
+        } else {
+            r.cov[(y * cw + x) as usize] as f32 / 255.0
+        }
+    };
+    let mut rgba = Vec::with_capacity((w * h * 4) as usize);
+    for y in 0..h {
+        for x in 0..w {
+            let (gx, gy) = (x - pad, y - pad);
+            let ink = at(gx, gy);
+            let mut sum = 0.0;
+            for dy in -1..=1 {
+                for dx in -1..=1 {
+                    sum += at(gx - 1 + dx, gy - 1 + dy);
+                }
+            }
+            let shadow = sum / 9.0 * 0.45;
+            let a = ink + shadow * (1.0 - ink);
+            let k = if a > 0.0 { ink / a } else { 0.0 };
+            rgba.extend_from_slice(&[
+                (colour[0] as f32 * k) as u8,
+                (colour[1] as f32 * k) as u8,
+                (colour[2] as f32 * k) as u8,
+                (a * 255.0).round() as u8,
+            ]);
+        }
+    }
+    CartFace {
+        rgba,
+        w: w as u32,
+        h: h as u32,
+    }
+}
+
 pub fn icon_face(icon: Icon, px: f32, colour: [u8; 3]) -> CartFace {
     let Some(r) = raster(icon, px) else {
         return CartFace {

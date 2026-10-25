@@ -30,6 +30,7 @@ mod slot_chrome;
 mod sticker;
 pub mod text;
 mod toast;
+mod xmb;
 
 pub use backdrop::{
     bezel_face, blur_background, default_background, default_game_bezel_face, draw_backdrop,
@@ -58,7 +59,7 @@ pub use hud::{
     badge_at, ff_badge, footer_ink, FfState, Hud, HudKind, LinkBadge, Millis, ALARM_BAND_H,
     HUD_ICON_PX, HUD_INK, HUD_MS, LINK_HOST_INK, LINK_JOIN_INK, PLATE_H,
 };
-pub use icon::{badge_face, icon_box, icon_face, star_face, warm_fonts, Badge, Icon};
+pub use icon::{badge_face, icon_box, icon_face, icon_face_soft, star_face, warm_fonts, Badge, Icon};
 pub use link_art::{
     link_art, LinkArt, ADAPTER_BASE_X, ADAPTER_BASE_Y, ADAPTER_H, ADAPTER_W, ARCS, ARROW_H,
     ARROW_LEFT_X, ARROW_RIGHT_X, ARROW_W, ARROW_Y, CLICKS_H, CLICKS_W, CLICKS_X, CLICKS_Y, PLUG_H,
@@ -105,3 +106,13 @@ pub use sticker::{
     CREDITS, DC, HOME, ORIGIN, STICKER_H, STICKER_W,
 };
 pub use toast::{toast_box, toast_face, toast_rect, Toast};
+pub use xmb::{
+    classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
+    xmb_curves,
+    xmb_curves_at, xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face,
+    XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
+    XMB_OUTRO_SECS,
+    xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_swatch, xmb_text_face, Xmb,
+    XmbArt, XmbCat, XmbClockEdit, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,
+    XmbText, XMB_COLOUR_COUNT, XMB_MONTHS, XMB_PALETTE, XMB_WAVE_CLASSIC, XMB_WAVE_ORIGINAL,
+};

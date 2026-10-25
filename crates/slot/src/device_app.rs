@@ -17,6 +17,13 @@ const MARGIN: Duration = Duration::from_micros(1500);
 
 const LOG_SYNC: Duration = Duration::from_secs(1);
 
+/// How often the bar is drawn while nothing but its slow waves moves: 20 frames a second, a
+/// third of the work, which keeps the handheld cool on the home screen.
+const CALM_FRAME: Duration = Duration::from_millis(50);
+
+/// How often input is still read between those frames.
+const CALM_POLL: Duration = Duration::from_millis(12);
+
 struct Pacer {
     last_return: Option<Instant>,
     period: Duration,
@@ -118,25 +125,71 @@ pub fn run() {
             return;
         }
     }
-    let platform = DevicePlatform::new(root.clone());
-    eprintln!("slot: {}", platform.report());
-    platform.trace_boot();
-    slot::boot_time::mark("platform");
-    let sink = match audio.map(|h| h.join()) {
-        Ok(Ok(sink)) => sink,
-        _ => slot::audio::opened_sink(),
+    // With the bar, the start-up animation is the first thing drawn, the moment the screen
+    // is ready; the platform, the sound and everything else load behind it.
+    let mut intro = BootIntro::begin(&root, &mut compositor, window);
+    let platform_root = root.clone();
+    let boot = move |intro: Option<(Instant, std::path::PathBuf, u8)>| {
+        let platform = DevicePlatform::new(platform_root);
+        eprintln!("slot: {}", platform.report());
+        platform.trace_boot();
+        slot::boot_time::mark("platform");
+        let sink = match audio.map(|h| h.join()) {
+            Ok(Ok(sink)) => sink,
+            _ => slot::audio::opened_sink(),
+        };
+        slot::boot_time::mark("audio");
+        if let Some((started, root, volume)) = intro {
+            BootIntro::chime(&root, &*sink, started, volume);
+        }
+        Frontend::boot_with(Box::new(platform), sink)
     };
-    slot::boot_time::mark("audio");
-    let mut frontend = Frontend::boot_with(Box::new(platform), sink);
+    let mut frontend = match &mut intro {
+        Some(intro) => {
+            let (tx, rx) = std::sync::mpsc::channel();
+            let chime = Some((intro.started, root.clone(), intro.volume));
+            let booting = std::thread::Builder::new()
+                .name("slot-boot".into())
+                .spawn(move || {
+                    let _ = tx.send(Booted(boot(chime)));
+                });
+            match booting {
+                Ok(_) => loop {
+                    if let Ok(Booted(f)) = rx.try_recv() {
+                        break f;
+                    }
+                    intro.frame(&mut compositor, &mut surface, true);
+                },
+                Err(e) => {
+                    eprintln!("slot: boot thread: {e}");
+                    return;
+                }
+            }
+        }
+        None => boot(None),
+    };
     slot::boot_time::mark("frontend");
+    let step = |intro: &mut Option<BootIntro>, compositor: &mut Compositor, surface: &mut FbdevSurface| {
+        if let Some(intro) = intro {
+            intro.frame(compositor, surface, true);
+        }
+    };
     let target = slot::baseos::var("BASEOS_TARGET").unwrap_or_default();
     frontend.set_left_stick(slot::input::evdev::has_left_stick(&target));
+    if let Some(intro) = &intro {
+        frontend.xmb_intro_played(intro.played_ms());
+    }
     frontend.upload_boot_faces(&mut compositor);
     slot::boot_time::mark("faces");
+    step(&mut intro, &mut compositor, &mut surface);
     frontend.upload_bezel(&mut compositor, window);
     slot::boot_time::mark("bezel");
+    step(&mut intro, &mut compositor, &mut surface);
     let mut input = DeviceInput::open(&root);
     slot::boot_time::mark("input");
+    if let Some(intro) = &intro {
+        frontend.xmb_intro_played(intro.played_ms());
+    }
     let card = root.clone();
     let _ = std::thread::Builder::new()
         .name("slot-bootlogo".into())
@@ -151,6 +204,7 @@ pub fn run() {
     frontend.drive_emulator();
     let mut pacer = Pacer::new();
     let (mut frames, mut missed, mut early) = (0u32, 0u32, 0u32);
+    let mut last_frame: Option<Instant> = None;
     loop {
         pacer.wait();
         let began = Instant::now();
@@ -171,8 +225,13 @@ pub fn run() {
             frontend.stop();
             return;
         }
+        if frontend.app().xmb_calm() && last_frame.is_some_and(|at| at.elapsed() < CALM_FRAME) {
+            std::thread::sleep(CALM_POLL);
+            continue;
+        }
         frontend.step_emulator(pacer.period, STEP_TIMEOUT);
         frontend.render(&mut compositor, window);
+        last_frame = Some(Instant::now());
         let swap = Instant::now();
         let work = swap - began;
         if let Err(e) = surface.swap() {
@@ -221,6 +280,161 @@ fn sync_log_writes() {
                 libc::syncfs(2);
             }
             synced = st.st_size;
+        }
+    }
+}
+
+/// The booted frontend, handed back from the thread that loaded it. It holds no game yet, and
+/// so nothing tied to the thread it was made on.
+struct Booted(Frontend);
+
+// SAFETY: the one part of a frontend that is not `Send` is the snapshot of a running game, which
+// is only set once a game starts; a frontend fresh from `boot_with` has none.
+unsafe impl Send for Booted {}
+
+/// The bar's start-up animation, drawn by the device before the frontend exists, from the
+/// colour and background the card has saved. Once loading outlasts it, the waves stay up with
+/// a breathing ring at the lower left.
+struct BootIntro {
+    started: Instant,
+    volume: u8,
+    window: (u32, u32),
+    style: u8,
+    colour: u32,
+    curves: slot_gfx::TexId,
+    flare: slot_gfx::TexId,
+    glint: slot_gfx::TexId,
+    ring: slot_gfx::TexId,
+    title: (slot_gfx::TexId, [f32; 4]),
+    foot: slot_gfx::TexId,
+    buf: Vec<u8>,
+    draws: Vec<slot_gfx::Draw>,
+    last: Option<Instant>,
+    /// Where the animation is, in seconds. It follows the clock but never jumps more than a
+    /// frame's worth, so a pause in the loading holds the picture rather than skipping on.
+    clock: f32,
+}
+
+impl BootIntro {
+    fn begin(root: &std::path::Path, compositor: &mut Compositor, window: (u32, u32)) -> Option<Self> {
+        if !slot::app::XMB {
+            return None;
+        }
+        let state = slot_store::read_slot_state(root);
+        // A first start sets the clock before anything else; the bar comes later.
+        if !state.clock_set {
+            return None;
+        }
+        // A game left running comes straight back, from the boot picture to the game.
+        if state.cart.is_some() {
+            return None;
+        }
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+        let wall = now + i64::from(state.utc_offset_min) * 60;
+        let colour = slot_ui::xmb_colour_index(state.xmb_colour, wall);
+        let style = state.xmb_wave.min(1);
+        let mut buf = Vec::new();
+        slot_ui::xmb_curves_at(style, 0.0, Some(0.0), &mut buf);
+        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+        let curves = compositor.create_texture_nearest(w, h, &buf);
+        let f = slot_ui::xmb_flare_face(slot_ui::xmb_pale(slot_ui::xmb_swatch(colour)));
+        let flare = compositor.create_texture(f.w, f.h, &f.rgba);
+        let f = slot_ui::xmb_flare_face([0xff; 3]);
+        let glint = compositor.create_texture(f.w, f.h, &f.rgba);
+        let f = slot_ui::xmb_foot_face(slot_ui::xmb_pale(slot_ui::xmb_swatch(colour)));
+        let foot = compositor.create_texture(f.w, f.h, &f.rgba);
+        let f = slot_ui::xmb_ring_face();
+        let ring = compositor.create_texture(f.w, f.h, &f.rgba);
+        let (f, at) = slot_ui::xmb_title_face(slot_gfx::Canvas::of(window));
+        let title = (compositor.create_texture(f.w, f.h, &f.rgba), at);
+        Some(BootIntro {
+            started: Instant::now(),
+            volume: state.volume,
+            window,
+            style,
+            colour,
+            curves,
+            flare,
+            glint,
+            ring,
+            title,
+            foot,
+            buf,
+            draws: Vec::new(),
+            last: None,
+            clock: 0.0,
+        })
+    }
+
+    /// The opening chime, in step with the animation: once the sound device is open, the part
+    /// of the chime already due is skipped.
+    fn chime(root: &std::path::Path, sink: &dyn slot::audio::AudioSink, started: Instant, volume: u8) {
+        let ring = sink.ring();
+        let rate = ring.sample_rate();
+        if rate == 0 {
+            return;
+        }
+        let sounds = slot::audio::XmbSounds::load(root);
+        let mut samples = sounds.render(slot::audio::XmbSound::Opening, rate);
+        let late = (started.elapsed().as_secs_f64() * rate as f64) as usize * 2;
+        if late >= samples.len() {
+            return;
+        }
+        samples.drain(..late);
+        slot::audio::volume::apply(&mut samples, volume);
+        ring.mix(&samples);
+    }
+
+    fn played_ms(&self) -> slot_input::Millis {
+        (self.clock * 1000.0) as slot_input::Millis
+    }
+
+    /// Draws the next frame, at most sixty a second.
+    fn frame(&mut self, compositor: &mut Compositor, surface: &mut FbdevSurface, loading: bool) {
+        if let Some(last) = self.last {
+            if let Some(left) = Duration::from_micros(16_000).checked_sub(last.elapsed()) {
+                std::thread::sleep(left);
+            }
+            self.clock += last.elapsed().as_secs_f32().min(0.05);
+        }
+        self.last = Some(Instant::now());
+        let t = self.clock;
+        slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
+        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+        compositor.update_texture(self.curves, w, h, &self.buf);
+        let canvas = slot_gfx::Canvas::of(self.window);
+        self.draws.clear();
+        slot_ui::XmbIntro {
+            canvas,
+            t,
+            backdrop: Some(slot_gfx::Backdrop {
+                curves: self.curves,
+                style: self.style,
+                colours: slot_ui::xmb_backdrop_colours(self.colour),
+                edges: slot_ui::xmb_backdrop_edges(self.colour),
+                shape: slot_gfx::BACKDROP_PLAIN,
+                alpha: 1.0,
+            }),
+            flare: Some(self.flare),
+            glint: Some(self.glint),
+            theme: slot_ui::xmb_swatch(self.colour).map(|v| v as f32 / 255.0),
+            title: Some(self.title),
+            foot: Some(self.foot),
+        }
+        .draw(&mut self.draws);
+        if loading && t > slot_ui::XMB_INTRO_BAR {
+            let a = ((t - slot_ui::XMB_INTRO_BAR) / 0.4).clamp(0.0, 1.0);
+            slot_ui::xmb_loading_ring(canvas, self.ring, t, a, &mut self.draws);
+        }
+        compositor.fit(self.window);
+        compositor.begin_frame();
+        compositor.draw_list(&self.draws);
+        compositor.end_frame(self.window);
+        if let Err(e) = surface.swap() {
+            eprintln!("slot: {e}");
         }
     }
 }

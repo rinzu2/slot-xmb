@@ -64,6 +64,7 @@ pub struct Frontend {
     link_shot: Option<TexId>,
     link_shot_size: (u32, u32),
     link_shot_shown: bool,
+    xmb: XmbSync,
 }
 
 #[derive(Default)]
@@ -125,6 +126,115 @@ struct Clocks {
     title: String,
     title_tex: Option<TexId>,
     ink: [u8; 3],
+}
+
+/// Textures for the cross-media-bar browser: icons and the glow built once, the wave curves
+/// every frame the bar is on screen (a few kilobytes; the GPU does the rest), and lines of text
+/// recycled as the selection moves so the texture count stays flat.
+#[derive(Default)]
+struct XmbSync {
+    built: bool,
+    art: slot_ui::XmbArt,
+    curves: Vec<u8>,
+    flare_rgb: Option<[u8; 3]>,
+    /// The canvas the start-up's lettering was rendered for.
+    title_for: Option<(u32, u32)>,
+    texts: std::collections::HashMap<String, slot_ui::XmbText>,
+    spare: Vec<TexId>,
+    last: Vec<String>,
+}
+
+fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
+    if !crate::app::XMB {
+        return;
+    }
+    if !xs.built {
+        xs.built = true;
+        for icon in slot_ui::XmbIcon::ALL {
+            let f = slot_ui::xmb_icon_face(icon);
+            xs.art.icons[icon.index()] = Some(compositor.create_texture_mipmapped(f.w, f.h, &f.rgba));
+        }
+        let g = slot_ui::xmb_glow_face();
+        xs.art.glow = Some(compositor.create_texture(g.w, g.h, &g.rgba));
+        let f = slot_ui::xmb_frame_glow_face();
+        xs.art.frame = Some(compositor.create_texture(f.w, f.h, &f.rgba));
+        let f = slot_ui::xmb_flare_face([0xff; 3]);
+        xs.art.glint = Some(compositor.create_texture(f.w, f.h, &f.rgba));
+        let f = slot_ui::xmb_ring_face();
+        xs.art.ring = Some(compositor.create_texture(f.w, f.h, &f.rgba));
+    }
+    let theme = app.xmb_theme_rgb();
+    if xs.flare_rgb != Some(theme) {
+        let f = slot_ui::xmb_flare_face(slot_ui::xmb_pale(theme));
+        match xs.art.flare {
+            Some(id) => compositor.update_texture(id, f.w, f.h, &f.rgba),
+            None => xs.art.flare = Some(compositor.create_texture(f.w, f.h, &f.rgba)),
+        }
+        let f = slot_ui::xmb_foot_face(slot_ui::xmb_pale(theme));
+        match xs.art.foot {
+            Some(id) => compositor.update_texture(id, f.w, f.h, &f.rgba),
+            None => xs.art.foot = Some(compositor.create_texture(f.w, f.h, &f.rgba)),
+        }
+        xs.flare_rgb = Some(theme);
+    }
+    let canvas = app.canvas();
+    let size = (canvas.w as u32, canvas.h as u32);
+    if xs.title_for != Some(size) {
+        let (f, at) = slot_ui::xmb_title_face(canvas);
+        let id = match xs.art.title {
+            Some((id, _)) => {
+                compositor.update_texture(id, f.w, f.h, &f.rgba);
+                id
+            }
+            None => compositor.create_texture(f.w, f.h, &f.rgba),
+        };
+        xs.art.title = Some((id, at));
+        xs.title_for = Some(size);
+    }
+    if app.xmb_visible() {
+        slot_ui::xmb_curves_at(
+            app.xmb_wave_style(),
+            app.xmb_time(),
+            app.xmb_intro_waves(),
+            &mut xs.curves,
+        );
+        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+        match xs.art.curves {
+            Some(id) => compositor.update_texture(id, w, h, &xs.curves),
+            // Nearest filtering: each texel packs 16-bit values that must not be blended.
+            None => xs.art.curves = Some(compositor.create_texture_nearest(w, h, &xs.curves)),
+        }
+    }
+    app.set_xmb_art(xs.art);
+    let wanted = app.xmb_texts_wanted();
+    if wanted == xs.last {
+        return;
+    }
+    let stale: Vec<String> = xs
+        .texts
+        .keys()
+        .filter(|k| !wanted.contains(*k))
+        .cloned()
+        .collect();
+    for k in stale {
+        if let Some((id, _, _)) = xs.texts.remove(&k) {
+            xs.spare.push(id);
+        }
+    }
+    for key in &wanted {
+        if xs.texts.contains_key(key) {
+            continue;
+        }
+        let Some((size, text)) = slot_ui::XmbSize::of_key(key) else {
+            continue;
+        };
+        let f = slot_ui::xmb_text_face(text, size);
+        let mut slot = xs.spare.pop();
+        let id = upload_rgba(compositor, &mut slot, f.w, f.h, &f.rgba);
+        xs.texts.insert(key.clone(), (id, f.w, f.h));
+    }
+    xs.last = wanted;
+    app.set_xmb_texts(xs.texts.clone());
 }
 
 struct ShelfLook {
@@ -198,6 +308,7 @@ impl Frontend {
             quick_palette: QuickPalette::default(),
             wallpaper: WallpaperSync::default(),
             game_bezel: BezelSync::default(),
+            xmb: XmbSync::default(),
             look: None,
             link_shot: None,
             link_shot_size: (0, 0),
@@ -248,7 +359,11 @@ impl Frontend {
         let icons = Icon::ALL
             .iter()
             .map(|i| {
-                let f = icon_face(*i, HUD_ICON_PX, HUD_INK);
+                // The bar draws its icons solid with a soft shadow, as the handheld does.
+                let f = match crate::app::XMB {
+                    true => slot_ui::icon_face_soft(*i, HUD_ICON_PX, [0xff; 3]),
+                    false => icon_face(*i, HUD_ICON_PX, HUD_INK),
+                };
                 compositor.create_texture(f.w, f.h, &f.rgba)
             })
             .collect();
@@ -580,6 +695,7 @@ impl Frontend {
         }
         self.cart_faces.sync(self.session.app_mut(), compositor);
         sync_clock(self.session.app_mut(), compositor, &mut self.clocks);
+        sync_xmb(self.session.app_mut(), compositor, &mut self.xmb);
         sync_binding_faces(self.session.app_mut(), compositor);
         sync_about(self.session.app_mut(), compositor, &mut self.about);
         sync_quick_clock(self.session.app_mut(), compositor, &mut self.quick_clock);
@@ -761,6 +877,11 @@ impl Frontend {
 
     pub fn gallery_textures(&self) -> usize {
         self.switcher.thumbs.len() + self.switcher.spare.len()
+    }
+
+    /// How far the device got with the start-up animation before this frontend was ready.
+    pub fn xmb_intro_played(&mut self, played_ms: Millis) {
+        self.session.app_mut().xmb_intro_played(played_ms);
     }
 
     pub fn app(&self) -> &crate::app::App {

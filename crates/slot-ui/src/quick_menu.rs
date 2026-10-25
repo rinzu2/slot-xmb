@@ -95,10 +95,21 @@ pub enum QuickRow {
     AutoLoad,
     UndoSave,
     UndoLoad,
+    XmbTheme,
+    XmbWave,
+    XmbColour,
+    XmbIcons,
+    XmbWallpaper,
+    XmbClock,
+    XmbSetClock,
+    XmbDateFormat,
+    XmbTimeFormat,
+    XmbTimeZone,
+    XmbBattery,
 }
 
 impl QuickRow {
-    pub const ALL: [QuickRow; 84] = [
+    pub const ALL: [QuickRow; 95] = [
         QuickRow::FastForward,
         QuickRow::FastForwardSound,
         QuickRow::Screen,
@@ -183,24 +194,54 @@ impl QuickRow {
         QuickRow::AutoLoad,
         QuickRow::UndoSave,
         QuickRow::UndoLoad,
+        QuickRow::XmbTheme,
+        QuickRow::XmbWave,
+        QuickRow::XmbColour,
+        QuickRow::XmbIcons,
+        QuickRow::XmbWallpaper,
+        QuickRow::XmbClock,
+        QuickRow::XmbSetClock,
+        QuickRow::XmbDateFormat,
+        QuickRow::XmbTimeFormat,
+        QuickRow::XmbTimeZone,
+        QuickRow::XmbBattery,
     ];
 
-    pub const MAIN: [QuickRow; 5] = [
+    /// The bar's own pages sit among these but are hidden with the carousel, where About keeps
+    /// its place at the end.
+    pub const MAIN: [QuickRow; 7] = [
         QuickRow::General,
         QuickRow::Screen,
         QuickRow::Game,
         QuickRow::Controls,
+        QuickRow::XmbTheme,
+        QuickRow::XmbClock,
         QuickRow::About,
     ];
 
-    pub const GENERAL: [QuickRow; 7] = [
+    pub const GENERAL: [QuickRow; 8] = [
         QuickRow::Theme,
         QuickRow::Wallpaper,
         QuickRow::WallpaperTint,
         QuickRow::Recents,
         QuickRow::ShowTitles,
         QuickRow::LidOff,
+        QuickRow::XmbBattery,
         QuickRow::DateTime,
+    ];
+
+    pub const XMB_THEME: [QuickRow; 4] = [
+        QuickRow::XmbWave,
+        QuickRow::XmbColour,
+        QuickRow::XmbWallpaper,
+        QuickRow::XmbIcons,
+    ];
+
+    pub const XMB_CLOCK: [QuickRow; 4] = [
+        QuickRow::XmbSetClock,
+        QuickRow::XmbDateFormat,
+        QuickRow::XmbTimeFormat,
+        QuickRow::XmbTimeZone,
     ];
 
     pub const CONTROL_PAGES: [QuickRow; 3] = [
@@ -347,10 +388,19 @@ impl QuickRow {
             | QuickRow::Theme
             | QuickRow::Recents
             | QuickRow::ShowTitles
+            | QuickRow::XmbBattery
             | QuickRow::LidOff => &QuickRow::GENERAL,
             QuickRow::ControlsShelf | QuickRow::Shortcuts | QuickRow::ControlsInGame => {
                 &QuickRow::CONTROL_PAGES
             }
+            QuickRow::XmbWave
+            | QuickRow::XmbColour
+            | QuickRow::XmbIcons
+            | QuickRow::XmbWallpaper => &QuickRow::XMB_THEME,
+            QuickRow::XmbSetClock
+            | QuickRow::XmbDateFormat
+            | QuickRow::XmbTimeFormat
+            | QuickRow::XmbTimeZone => &QuickRow::XMB_CLOCK,
             QuickRow::Resume
             | QuickRow::UndoSave
             | QuickRow::UndoLoad
@@ -384,6 +434,8 @@ impl QuickRow {
             QuickRow::GameUp => Some(QuickRow::ControlsInGame),
             QuickRow::ScSave => Some(QuickRow::Shortcuts),
             QuickRow::Theme => Some(QuickRow::General),
+            QuickRow::XmbWave => Some(QuickRow::XmbTheme),
+            QuickRow::XmbSetClock => Some(QuickRow::XmbClock),
             QuickRow::ControlsShelf => Some(QuickRow::Controls),
             QuickRow::ShelfPrev => Some(QuickRow::ControlsShelf),
             _ => None,
@@ -419,6 +471,8 @@ impl QuickRow {
             QuickRow::PlayControls => Some(QuickRow::CONTROLS[0]),
             QuickRow::Shortcuts => Some(QuickRow::SHORTCUTS[0]),
             QuickRow::General => Some(QuickRow::GENERAL[0]),
+            QuickRow::XmbTheme => Some(QuickRow::XMB_THEME[0]),
+            QuickRow::XmbClock => Some(QuickRow::XMB_CLOCK[0]),
             QuickRow::Controls => Some(QuickRow::CONTROL_PAGES[0]),
             QuickRow::ControlsShelf => Some(QuickRow::SHELF_KEYS[0]),
             QuickRow::ControlsInGame => Some(QuickRow::CONTROLS[0]),
@@ -529,6 +583,17 @@ impl QuickRow {
             QuickRow::GbcBezel => "Bezel",
             QuickRow::GbaBezel => "Bezel",
             QuickRow::Bezel => "Bezel",
+            QuickRow::XmbTheme => "Theme Settings",
+            QuickRow::XmbWave => "Background",
+            QuickRow::XmbColour => "Color",
+            QuickRow::XmbIcons => "Game Icons",
+            QuickRow::XmbWallpaper => "Wallpaper",
+            QuickRow::XmbClock => "Date & Time Settings",
+            QuickRow::XmbSetClock => "Date & Time",
+            QuickRow::XmbDateFormat => "Date Format",
+            QuickRow::XmbTimeFormat => "Time Format",
+            QuickRow::XmbTimeZone => "Time Zone",
+            QuickRow::XmbBattery => "Battery Percentage",
         }
     }
 
@@ -549,6 +614,9 @@ impl QuickRow {
                 | QuickRow::PlayScreen
                 | QuickRow::PlayGameplay
                 | QuickRow::General
+                | QuickRow::XmbTheme
+                | QuickRow::XmbClock
+                | QuickRow::XmbSetClock
                 | QuickRow::Controls
                 | QuickRow::ControlsShelf
                 | QuickRow::ControlsInGame

@@ -127,6 +127,9 @@ pub fn compose(wordmark: &Bmp, (width, height): (usize, usize)) -> Option<Bmp> {
 pub enum Logo {
     Exact(Vec<u8>),
     Wordmark(Vec<u8>),
+    /// The start-up animation's first frame: with the bar, the picture the device shows from
+    /// power-on is where the animation picks up.
+    Intro,
 }
 
 struct Plan {
@@ -142,6 +145,20 @@ fn built(logo: &Logo, current: Option<&[u8]>, original: Option<&[u8]>) -> Option
             let mark = decode(bytes)?;
             let panel = original.or(current).and_then(size)?;
             compose(&mark, panel).map(|b| encode(&b))
+        }
+        Logo::Intro => {
+            let panel = original.or(current).and_then(size)?;
+            // The animation is drawn landscape; `compose` turns it for an upright panel.
+            let (width, height) = match panel {
+                (w, h) if h > w => (h, w),
+                other => other,
+            };
+            let picture = Bmp {
+                width,
+                height,
+                rgb: slot_ui::xmb_boot_picture(width as u32, height as u32),
+            };
+            compose(&picture, panel).map(|b| encode(&b))
         }
     }
 }
@@ -205,6 +222,9 @@ fn replace(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<()> {
 pub fn chosen(card: &Path) -> Option<Logo> {
     if let Ok(logo) = fs::read(card.join(USER_LOGO)) {
         return Some(Logo::Exact(logo));
+    }
+    if crate::app::XMB {
+        return Some(Logo::Intro);
     }
     let shipped = fs::read(card.join(CARD_LOGO)).ok()?;
     if decode(&shipped).is_none() {

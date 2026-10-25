@@ -66,6 +66,10 @@ impl CartFaces {
             self.requeue(app, &wants);
             self.asked = wants;
         }
+        // While the start-up animation hides the bar, faces arrive as they are ready.
+        if app.xmb_holds_faces() {
+            return;
+        }
         let mut waiting: Vec<Key> = self
             .asked
             .iter()

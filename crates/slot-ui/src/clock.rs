@@ -129,6 +129,18 @@ impl ClockPicker {
         self.offset_min
     }
 
+    pub fn year(&self) -> i64 {
+        self.year
+    }
+
+    pub fn hour(&self) -> i64 {
+        self.hour
+    }
+
+    pub fn minute(&self) -> i64 {
+        self.minute
+    }
+
     pub fn month(&self) -> i64 {
         self.month
     }

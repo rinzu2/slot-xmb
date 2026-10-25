@@ -8,6 +8,7 @@ mod silence;
 mod sink;
 mod stub;
 pub mod volume;
+mod xmb_sound;
 
 pub use alsa::AlsaSink;
 #[cfg(feature = "host")]
@@ -18,6 +19,7 @@ pub use sfx::Sfx;
 pub use silence::Silence;
 pub use sink::{AudioError, AudioSink};
 pub use stub::StubSink;
+pub use xmb_sound::{XmbSound, XmbSounds};
 
 pub const OUTPUT_HZ: u32 = 48_000;
 

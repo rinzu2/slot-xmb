@@ -325,7 +325,7 @@ tasks:
         vars:
           CMD: >-
             cargo build --profile device --target-dir target-device
-            -p slot --no-default-features --features device
+            -p slot --no-default-features --features device{{if .XMB}},xmb{{end}}
       - file target-device/device/slot | grep -q aarch64
       - 'echo "built target-device/device/slot"'
 

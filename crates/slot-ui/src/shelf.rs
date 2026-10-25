@@ -220,6 +220,12 @@ impl Shelf {
         [self.interiors.get(i).copied().flatten(), board]
     }
 
+    /// Where the label sits on cart `i`'s face, as fractions of the face: x, y, w, h.
+    pub fn label_box(&self, i: usize) -> [f32; 4] {
+        let (x, y, w, h) = label_rect(self.shell(i));
+        [x, y, w, h]
+    }
+
     pub fn find(&self, stem: &str) -> Option<(&Cart, Option<TexId>)> {
         let i = self.carts.iter().position(|c| c.stem == stem)?;
         Some((&self.carts[i], self.face(i)))

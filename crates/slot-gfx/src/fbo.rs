@@ -1,3 +1,4 @@
+use crate::backdrop::BackdropPass;
 use crate::draw::{Draw, Sprites, TexId};
 use crate::grade::blue_light_gain;
 use crate::pipeline::GamePass;
@@ -30,6 +31,7 @@ pub struct Compositor {
     quad: Quad,
     game: GamePass,
     sprites: Sprites,
+    backdrop: BackdropPass,
     game_bezel: Option<TexId>,
     sp_frame: bool,
     turn: Option<Turn>,
@@ -80,6 +82,7 @@ impl Compositor {
                 quad: Quad::new(),
                 game: GamePass::new()?,
                 sprites: Sprites::new()?,
+                backdrop: BackdropPass::new()?,
                 game_bezel: None,
                 sp_frame: true,
                 turn: None,
@@ -139,6 +142,13 @@ impl Compositor {
                         self.in_game_rect(|c| c.game.draw_still(tex, &c.quad));
                     }
                 }
+                Draw::Backdrop(b) => {
+                    self.sprites.draw(&items[from..i], &self.quad);
+                    if let Some(curves) = self.sprites.source(b.curves) {
+                        self.backdrop
+                            .draw(&b, curves, Canvas::of(self.window), &self.quad);
+                    }
+                }
                 Draw::Capture => {
                     self.sprites.draw(&items[from..i], &self.quad);
                     let (w, h) = self.size;
@@ -157,6 +167,10 @@ impl Compositor {
 
     pub fn create_texture_nearest(&mut self, w: u32, h: u32, rgba: &[u8]) -> TexId {
         self.sprites.create_texture_nearest(w, h, rgba)
+    }
+
+    pub fn create_texture_mipmapped(&mut self, w: u32, h: u32, rgba: &[u8]) -> TexId {
+        self.sprites.create_texture_mipmapped(w, h, rgba)
     }
 
     pub fn update_texture(&mut self, id: TexId, w: u32, h: u32, rgba: &[u8]) {

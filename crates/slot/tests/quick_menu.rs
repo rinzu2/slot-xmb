@@ -808,7 +808,7 @@ fn the_legend_says_change_on_a_value_row_and_open_on_a_row_that_opens() {
     let (_d, mut a, _) = on_carousel();
     fake_faces(&mut a);
     a.apply(Action::QuickMenu);
-    for row in QuickRow::MAIN {
+    for row in QuickRow::MAIN.into_iter().filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock)) {
         assert_eq!(a.quick_menu(), Some(row));
         let out = frame(&a);
         assert!(drawn(&out, 400), "no B BACK on {row:?}");
@@ -866,7 +866,7 @@ fn the_pointer_stands_left_of_the_selected_row_and_only_it_is_lit() {
     let (_d, mut a, _) = on_carousel();
     fake_faces(&mut a);
     a.apply(Action::QuickMenu);
-    for row in QuickRow::MAIN {
+    for row in QuickRow::MAIN.into_iter().filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock)) {
         let out = frame(&a);
         let pointers: Vec<_> = out
             .iter()
@@ -884,7 +884,10 @@ fn the_pointer_stands_left_of_the_selected_row_and_only_it_is_lit() {
             ly + lh / 2.0,
             "{row:?}: the pointer is off the row"
         );
-        for other in QuickRow::MAIN.into_iter().filter(|r| *r != row) {
+        for other in QuickRow::MAIN
+            .into_iter()
+            .filter(|r| *r != row && !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock))
+        {
             assert!(drawn(&out, label(other, false)), "{other:?} is not grey");
             assert!(!drawn(&out, label(other, true)), "{other:?} is lit");
         }

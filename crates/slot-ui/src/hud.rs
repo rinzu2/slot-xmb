@@ -156,11 +156,18 @@ pub struct Hud {
     toasts: Vec<TexId>,
     link: LinkBadge,
     link_faces: Vec<TexId>,
+    /// Show levels the way the cross-media bar's handheld does: a row of segments low on the
+    /// screen, rather than a bar across the top.
+    psp: bool,
 }
 
 impl Hud {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn set_psp(&mut self, on: bool) {
+        self.psp = on;
     }
 
     pub fn set_icons(&mut self, icons: Vec<TexId>) {
@@ -260,7 +267,13 @@ impl Hud {
     pub fn draw(&self, canvas: Canvas, now: Millis, out: &mut Vec<Draw>) {
         let alpha = self.alpha(now);
         let toast = self.toast_alpha(now);
-        if alpha > 0.0 || toast > 0.0 {
+        let level = matches!(
+            self.kind,
+            HudKind::Brightness | HudKind::BlueLight | HudKind::Volume
+        );
+        if self.psp && level && alpha > 0.0 && toast <= 0.0 {
+            self.draw_segments(canvas, alpha, out);
+        } else if alpha > 0.0 || toast > 0.0 {
             out.push(Draw::Rect {
                 x: 0.0,
                 y: 0.0,
@@ -314,6 +327,63 @@ impl Hud {
             h: BAR_H,
             colour: faded(FILL, alpha),
         });
+    }
+
+    /// The level as a row of segments near the bottom of the screen, its icon to the left, on a
+    /// soft dark band.
+    /// The handheld's level gauge, measured off its screen: along the foot of the screen, the
+    /// icon at the left, then a tick for every step at a fixed spacing, so a scale with fewer
+    /// steps (brightness, screen temperature) makes a shorter gauge. Steps reached are short
+    /// upright bars, the rest dots, each with a soft shadow.
+    fn draw_segments(&self, canvas: Canvas, alpha: f32, out: &mut Vec<Draw>) {
+        let (w, h) = (canvas.w, canvas.h);
+        let s = h / OUT_H as f32;
+        // At most thirty ticks, as the handheld shows; finer scales are shared out over them.
+        let full = self.kind.max().max(1) as usize;
+        let max = full.min(30);
+        let lit = (self.value.min(self.kind.max()) as usize * max).div_ceil(full);
+        let lit = if self.muted && self.kind == HudKind::Volume { 0 } else { lit };
+        let y = (h * 0.906).round();
+        let (iw, ih) = icon_box(HUD_ICON_PX);
+        let scale = (h * 0.07) / ih as f32;
+        let (iw, ih) = (iw as f32 * scale, ih as f32 * scale);
+        if let Some(tex) = self.icon() {
+            out.push(Draw::Tex {
+                x: (w * 0.084 - iw / 2.0).round(),
+                y: (y - ih / 2.0).round(),
+                w: iw,
+                h: ih,
+                tex,
+                alpha,
+            });
+        }
+        let x0 = w * 0.137;
+        let pitch = w * 0.0249;
+        let bar_w = (w * 0.0058).round().max(2.0);
+        let bar_h = (h * 0.042).round();
+        let dot = (h * 0.008).round().max(2.0);
+        let shadow = (1.5 * s).round().max(1.0);
+        for i in 0..max {
+            let x = (x0 + i as f32 * pitch).round();
+            let (tw, th) = if i < lit { (bar_w, bar_h) } else { (dot, dot) };
+            let (tx, ty) = (x - (tw / 2.0).floor(), (y - th / 2.0).round());
+            for (grow, a) in [(1.0, 0.12), (0.0, 0.3)] {
+                out.push(Draw::Rect {
+                    x: tx + shadow - grow,
+                    y: ty + shadow - grow,
+                    w: tw + 2.0 * grow,
+                    h: th + 2.0 * grow,
+                    colour: [0.0, 0.0, 0.0, a * alpha],
+                });
+            }
+            out.push(Draw::Rect {
+                x: tx,
+                y: ty,
+                w: tw,
+                h: th,
+                colour: [1.0, 1.0, 1.0, alpha],
+            });
+        }
     }
 
     fn place_badge(&self, canvas: Canvas, tex: TexId, out: &mut Vec<Draw>) {
