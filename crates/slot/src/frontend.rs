@@ -162,6 +162,10 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
         xs.art.glint = Some(compositor.create_texture(f.w, f.h, &f.rgba));
         let f = slot_ui::xmb_ring_face();
         xs.art.ring = Some(compositor.create_texture(f.w, f.h, &f.rgba));
+        for k in 0..slot_ui::XMB_HALOS {
+            let (f, margin) = slot_ui::xmb_cart_halo_face(k);
+            xs.art.halos[k] = Some((compositor.create_texture(f.w, f.h, &f.rgba), margin));
+        }
     }
     let theme = app.xmb_theme_rgb();
     if xs.flare_rgb != Some(theme) {

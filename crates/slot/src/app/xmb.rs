@@ -485,6 +485,7 @@ impl App {
                 aspect: 1.0,
                 colour: [0xff; 3],
                 title: t.get(XmbSize::Title, r.label()),
+                halo: None,
             })
             .collect()
     }
@@ -609,6 +610,10 @@ impl App {
                 aspect,
                 colour: slot_ui::label_colour(&title),
                 title: t.get(XmbSize::Title, &title),
+                halo: match self.state.xmb_labels && face.is_some() {
+                    true => None,
+                    false => Some(slot_ui::xmb_halo_index(slot_ui::gb_shell_of(cart))),
+                },
             });
         }
         rows

@@ -74,6 +74,10 @@ impl Soft {
         art.glint = Some(self.add(f.w, f.h, f.rgba));
         let f = slot_ui::xmb_ring_face();
         art.ring = Some(self.add(f.w, f.h, f.rgba));
+        for k in 0..slot_ui::XMB_HALOS {
+            let (f, margin) = slot_ui::xmb_cart_halo_face(k);
+            art.halos[k] = Some((self.add(f.w, f.h, f.rgba), margin));
+        }
         let (f, at) = slot_ui::xmb_title_face(app.canvas());
         art.title = Some((self.add(f.w, f.h, f.rgba), at));
         let mut curves = Vec::new();

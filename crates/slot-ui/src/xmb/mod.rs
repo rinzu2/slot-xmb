@@ -9,7 +9,10 @@ mod palette;
 mod text;
 mod waves;
 
-pub use art::{xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, XmbIcon, XMB_ICONS};
+pub use art::{
+    xmb_cart_halo_face, xmb_frame_glow_face, xmb_glow_face, xmb_halo_index, xmb_icon_face, XmbIcon,
+    XMB_HALOS, XMB_ICONS,
+};
 pub use palette::{
     month_of, xmb_backdrop_colours, xmb_backdrop_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS, xmb_swatch, XMB_COLOUR_COUNT, XMB_MONTHS,
     XMB_PALETTE,
@@ -45,6 +48,8 @@ pub struct XmbArt {
     pub title: Option<(TexId, [f32; 4])>,
     /// The glow from the foot of the screen, in the theme's pale colour.
     pub foot: Option<TexId>,
+    /// `xmb_cart_halo_face` for each cart outline, with its margins.
+    pub halos: [Option<(TexId, [f32; 2])>; XMB_HALOS],
 }
 
 /// A rendered line of text and its size.
@@ -66,6 +71,8 @@ pub struct XmbRow {
     pub aspect: f32,
     pub colour: [u8; 3],
     pub title: Option<XmbText>,
+    /// For a cart drawn whole, which outline's halo it glows with (`xmb_halo_index`).
+    pub halo: Option<usize>,
 }
 
 /// How big a column's rows are, in pixels on a 480-line screen.
@@ -386,9 +393,24 @@ impl Xmb<'_> {
             let (ix, iy) = ((x - w / 2.0).round(), (y - h / 2.0).round());
             // The highlighted item glows, breathing slowly: a cover all round its edge.
             if self.sizes.covers && near > 0.5 {
-                if let Some(tex) = self.art.frame {
-                    let g = (near - 0.5) * 2.0 * (1.0 - nest) * (self.pulse() * 1.35).min(1.0) * a;
-                    nine_slice(tex, ix, iy, w, h, 22.0 * s, g, out);
+                let g = (near - 0.5) * 2.0 * (1.0 - nest) * (self.pulse() * 1.35).min(1.0) * a;
+                match row.halo.and_then(|k| self.art.halos.get(k).copied().flatten()) {
+                    // A whole cart: the glow follows its outline exactly.
+                    Some((tex, [mx, my])) if g > 0.0 => out.push(Draw::Tex {
+                        x: ix - w * mx,
+                        y: iy - h * my,
+                        w: w * (1.0 + 2.0 * mx),
+                        h: h * (1.0 + 2.0 * my),
+                        tex,
+                        alpha: g,
+                    }),
+                    Some(_) => {}
+                    // A label: a rectangle, so the square frame fits it.
+                    None => {
+                        if let Some(tex) = self.art.frame {
+                            nine_slice(tex, ix, iy, w, h, 22.0 * s, g, out);
+                        }
+                    }
                 }
             } else if near > 0.5 && nest < 1.0 {
                 if let Some(tex) = self.art.glow {

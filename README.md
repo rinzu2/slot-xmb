@@ -79,9 +79,10 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 
 # Install
 
-1. Install upstream slot as described in the [slot guide](https://slot-cfw.fyi).
-2. Download `slot-xmb-rgsp.zip` from this fork's [releases](../../releases).
-3. Copy its `System/slot` over the one on your SD card.
+Download `slot-xmb-v1.0-h700.zip` from this fork's [releases](../../releases). It's the complete slot v1.9.0 card layout, with the same cores, scripts and folders, plus the XMB build of `System/slot`.
+
+- **New install:** follow the [slot guide](https://slot-cfw.fyi), using this zip in place of slot's own release.
+- **Already running slot v1.9.0:** copy only `System/slot` from the zip over the one on your SD card. Your games, saves and settings stay as they are.
 
 The boot picture is written to the device the first time the new build runs. It shows from the following boot onwards.
 

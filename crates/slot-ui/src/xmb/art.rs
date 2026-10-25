@@ -520,3 +520,82 @@ pub fn xmb_glow_face() -> CartFace {
     }
     CartFace { rgba, w: s, h: s }
 }
+
+/// How many cart outlines have a halo: the GBA cart, the notched pak and the rounded one.
+pub const XMB_HALOS: usize = 3;
+
+/// The halo for a cart outline, as `xmb_halo_of` numbers them.
+pub fn xmb_halo_index(shell: Option<crate::GbShell>) -> usize {
+    match shell {
+        None => 0,
+        Some(crate::GbShell::Notched) => 1,
+        Some(crate::GbShell::Rounded) => 2,
+    }
+}
+
+/// The glow around the highlighted cart, following its outline: notches, rounded corners and
+/// all. Built from the cart's own silhouette, blurred out past its edge and cut away beneath
+/// it, with a margin on every side. Returns the face and that margin as fractions of the
+/// cart's width and height, so it can be laid exactly over the drawn cart.
+pub fn xmb_cart_halo_face(index: usize) -> (CartFace, [f32; 2]) {
+    let shadow = match index {
+        0 => crate::cart_shadow(),
+        1 => crate::gb_cart_shadow(crate::GbShell::Notched),
+        _ => crate::gb_cart_shadow(crate::GbShell::Rounded),
+    };
+    let (cw, ch) = (shadow.w as usize, shadow.h as usize);
+    let mask: Vec<f32> = shadow.rgba.chunks_exact(4).map(|p| p[3] as f32 / 255.0).collect();
+    // As wide as the old square frame was against a cover: about a sixth of the cart's height.
+    let m = (ch as f32 * 0.177).round() as usize;
+    let (w, h) = (cw + 2 * m, ch + 2 * m);
+    let mut buf = vec![0.0f32; w * h];
+    for y in 0..ch {
+        buf[(y + m) * w + m..(y + m) * w + m + cw].copy_from_slice(&mask[y * cw..(y + 1) * cw]);
+    }
+    // Three box blurs make a smooth, nearly Gaussian falloff.
+    let r = (m / 3).max(1);
+    let mut tmp = vec![0.0f32; w * h];
+    for _ in 0..3 {
+        box_blur(&buf, &mut tmp, w, h, r, true);
+        box_blur(&tmp, &mut buf, w, h, r, false);
+    }
+    let mut rgba = Vec::with_capacity(w * h * 4);
+    for y in 0..h {
+        for x in 0..w {
+            let inside = match (x.checked_sub(m), y.checked_sub(m)) {
+                (Some(cx), Some(cy)) if cx < cw && cy < ch => mask[cy * cw + cx],
+                _ => 0.0,
+            };
+            let a = (buf[y * w + x] * 2.0).min(1.0) * (1.0 - inside);
+            rgba.extend_from_slice(&[255, 255, 255, (a * 255.0).round() as u8]);
+        }
+    }
+    let face = CartFace {
+        rgba,
+        w: w as u32,
+        h: h as u32,
+    };
+    (face, [m as f32 / cw as f32, m as f32 / ch as f32])
+}
+
+/// A running-sum box blur of radius `r`, along rows or down columns, edges held at zero.
+fn box_blur(src: &[f32], dst: &mut [f32], w: usize, h: usize, r: usize, rows: bool) {
+    let (n, lines) = if rows { (w, h) } else { (h, w) };
+    let at = |line: usize, i: usize| if rows { line * w + i } else { i * w + line };
+    let k = 1.0 / (2 * r + 1) as f32;
+    for line in 0..lines {
+        let mut sum = 0.0f32;
+        for i in 0..=r.min(n - 1) {
+            sum += src[at(line, i)];
+        }
+        for i in 0..n {
+            dst[at(line, i)] = sum * k;
+            if i + r + 1 < n {
+                sum += src[at(line, i + r + 1)];
+            }
+            if i >= r {
+                sum -= src[at(line, i - r)];
+            }
+        }
+    }
+}
