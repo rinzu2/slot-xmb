@@ -33,10 +33,10 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 </p>
 <p align="center">
 <img src=".github/resources/xmb/03_settings.png" width="48%" alt="The Settings column, in Green with Classic waves">
-<img src=".github/resources/xmb/05_colour_picker.png" width="48%" alt="Picking a colour in Theme Settings, previewing Orange">
+<img src=".github/resources/xmb/05_colour_picker.png" width="48%" alt="Picking a colour in Theme Settings, previewing Red">
 </p>
 <p align="center">
-<img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge, in Crimson">
+<img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge, in Indigo with Classic waves">
 <img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu">
 </p>
 <p align="center">
