@@ -146,6 +146,105 @@ struct XmbSync {
     texts: std::collections::HashMap<String, slot_ui::XmbText>,
     spare: Vec<TexId>,
     last: Vec<String>,
+    /// The Modern background, while it is the one chosen.
+    modern: Option<ModernSync>,
+}
+
+/// The PS3's scene and what it was last told.
+pub struct ModernSync {
+    pub scene: slot_ui::xmb_modern::ModernScene,
+    time: Option<f32>,
+    /// Whether its start has played, or the bar's start is over without one.
+    booted: bool,
+    look: Option<crate::app::ModernLook>,
+    place: Option<(i32, i32)>,
+}
+
+impl ModernSync {
+    pub fn new(scene: slot_ui::xmb_modern::ModernScene, booted: bool) -> Self {
+        ModernSync {
+            scene,
+            time: None,
+            booted,
+            look: None,
+            place: None,
+        }
+    }
+}
+
+impl ModernSync {
+    /// The frame `drive` last returned.
+    pub fn frame(&self) -> &slot_gfx::ModernFrame {
+        self.scene.last_frame()
+    }
+
+    /// Moves the scene on to where the bar is, and returns the frame to draw: the colour the bar
+    /// asks for (from the card's own background pictures, `grounds`, when it has them), its
+    /// start under the boot picture, the bar's moves stirring the sparkles, and the clock.
+    pub fn drive(&mut self, app: &App, grounds: Option<&[slot_ui::CartFace]>) -> &slot_gfx::ModernFrame {
+        use slot_ui::xmb_modern::{xmb_modern_picture, xmb_modern_picture_of, ModernColour, Wall};
+        let look = app.xmb_modern_look();
+        if self.look != Some(look) {
+            self.look = Some(look);
+            let ground = |colour: u32| {
+                grounds
+                    .and_then(|g| crate::xmb_ground::face(g, colour))
+                    .map(|f| (f.w, f.h, &f.rgba[..]))
+            };
+            self.scene.set_colour(match look {
+                crate::app::ModernLook::Months => ModernColour::Months,
+                crate::app::ModernLook::Colour(c) => ModernColour::Picture(xmb_modern_picture(c, ground(c))),
+                crate::app::ModernLook::Dark => {
+                    ModernColour::Picture(xmb_modern_picture_of(&slot_ui::xmb_pause_colours(), None))
+                }
+            });
+        }
+        // The PS3's start plays under the boot picture once the bar's start reaches it.
+        match app.xmb_intro_clock() {
+            Some(t) if !self.booted && t >= slot_ui::XMB_MODERN_START => {
+                self.scene.boot();
+                self.booted = true;
+            }
+            None => self.booted = true,
+            _ => {}
+        }
+        let now = app.xmb_time();
+        let dt = self.time.map_or(1.0 / 60.0, |was| now - was);
+        // A long gap (frames held back, a test's settling) is run through in steps; a jump of
+        // the clock is not.
+        let mut dt = if (0.0..30.0).contains(&dt) { dt as f64 } else { 1.0 / 60.0 };
+        self.time = Some(now);
+        let place = app.xmb_place();
+        let mut steps = Vec::new();
+        if let Some((col, row)) = self.place {
+            if place.0 != col {
+                steps.push(if place.0 < col { 0 } else { 1 });
+            }
+            if place.1 != row {
+                steps.push(if place.1 < row { 2 } else { 3 });
+            }
+        }
+        self.place = Some(place);
+        let canvas = app.canvas();
+        let aspect = (canvas.w / canvas.h.max(1.0)) as f64;
+        let wall = Wall::of(app.wall_secs() as f64);
+        let mut steps = &steps[..];
+        while dt > 0.0 {
+            let step = dt.min(1.0 / 30.0);
+            self.scene.advance(step, wall, steps, None, aspect);
+            steps = &[];
+            dt -= step;
+        }
+        self.scene.frame()
+    }
+}
+
+fn sync_modern(app: &App, compositor: &mut Compositor, xs: &mut XmbSync) {
+    let m = xs
+        .modern
+        .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernScene::new(None), false));
+    let frame = m.drive(app, xs.grounds.as_deref());
+    compositor.set_modern(frame);
 }
 
 fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
@@ -214,6 +313,9 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
         };
         xs.art.title = Some((id, at));
         xs.title_for = Some(size);
+    }
+    if app.xmb_visible() && app.xmb_modern() {
+        sync_modern(app, compositor, xs);
     }
     if app.xmb_visible() {
         slot_ui::xmb_curves_at(
@@ -906,6 +1008,11 @@ impl Frontend {
     /// How far the device got with the start-up animation before this frontend was ready.
     pub fn xmb_intro_played(&mut self, played_ms: Millis) {
         self.session.app_mut().xmb_intro_played(played_ms);
+    }
+
+    /// Takes on the Modern scene the device's start-up animation began, so it carries on.
+    pub fn adopt_modern(&mut self, modern: ModernSync) {
+        self.xmb.modern = Some(modern);
     }
 
     pub fn app(&self) -> &crate::app::App {

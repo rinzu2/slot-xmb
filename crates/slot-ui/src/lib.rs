@@ -106,11 +106,12 @@ pub use sticker::{
     CREDITS, DC, HOME, ORIGIN, STICKER_H, STICKER_W,
 };
 pub use toast::{toast_box, toast_face, toast_rect, Toast};
+pub use xmb::modern as xmb_modern;
 pub use xmb::{
     classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
     xmb_curves,
     xmb_curves_at, xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face,
-    XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
+    XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_MODERN_START, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
     XMB_OUTRO_SECS,
     xmb_cart_halo_face, xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS, xmb_halo_index, XMB_HALOS, xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_swatch, xmb_text_face, Xmb,
     XmbArt, XmbCat, XmbClockEdit, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,

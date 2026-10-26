@@ -132,6 +132,17 @@ const ALERT_GONE: f32 = 0.9;
 
 const CLOCK_FLOOR: i64 = 1_577_836_800;
 
+/// What the Modern background's backdrop shows (`App::xmb_modern_look`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModernLook {
+    /// The PS3's own month textures, by the clock.
+    Months,
+    /// One of the bar's colours, 1 to 34.
+    Colour(u32),
+    /// The paused game's dark backdrop.
+    Dark,
+}
+
 pub enum PendingUndo {
     Save {
         stamp: String,
@@ -3012,11 +3023,13 @@ impl App {
         let row = self.playing_row(row);
         match row {
             QuickRow::XmbWave => {
-                // Original, Classic, then the wallpaper.
-                self.state.xmb_wave = match right {
-                    true => (self.state.xmb_wave.min(2) + 1) % 3,
-                    false => (self.state.xmb_wave.min(2) + 2) % 3,
-                };
+                // Original, Classic, Modern, then the wallpaper.
+                const ORDER: [u8; 4] = [0, 1, 3, 2];
+                let at = ORDER.iter().position(|&w| w == self.state.xmb_wave).unwrap_or(0);
+                self.state.xmb_wave = ORDER[match right {
+                    true => (at + 1) % ORDER.len(),
+                    false => (at + ORDER.len() - 1) % ORDER.len(),
+                }];
                 return self.persist();
             }
             QuickRow::XmbDateFormat => {

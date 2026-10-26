@@ -188,10 +188,49 @@ impl App {
         slot_ui::xmb_colour_index(self.state.xmb_colour, self.wall_secs())
     }
 
-    /// The waves drawn: Classic when chosen, Original otherwise (a wallpaper background still
-    /// shows Original's waves behind the in-game menu).
+    /// The waves drawn: Classic or Modern when chosen, Original otherwise (a wallpaper
+    /// background still shows Original's waves behind the in-game menu).
     pub fn xmb_wave_style(&self) -> u8 {
-        self.state.xmb_wave.min(1)
+        match self.state.xmb_wave {
+            1 => slot_gfx::STYLE_CLASSIC,
+            3 => slot_gfx::STYLE_MODERN,
+            _ => slot_gfx::STYLE_ORIGINAL,
+        }
+    }
+
+    /// Whether the background is the PS3's wave, which the frontend runs (`slot_ui::xmb_modern`).
+    pub fn xmb_modern(&self) -> bool {
+        XMB && self.state.xmb_wave == 3
+    }
+
+    /// What the Modern backdrop shows: the console's own months, a colour of the bar's, or the
+    /// paused game's dark one.
+    pub fn xmb_modern_look(&self) -> ModernLook {
+        if self.state.xmb_pause_dark && matches!(self.phase, Phase::Playing { .. }) {
+            return ModernLook::Dark;
+        }
+        match self.state.xmb_colour {
+            0 => ModernLook::Months,
+            _ => ModernLook::Colour(self.xmb_colour()),
+        }
+    }
+
+    /// Where the bar's cursor is: its category, and the row within it, to tell which way a move
+    /// went (the PS3's sparkles drift as its icons slide).
+    pub fn xmb_place(&self) -> (i32, i32) {
+        let row = match (&self.phase, self.in_game_menu) {
+            (Phase::Playing { .. }, Some(row)) | (&Phase::QuickMenu { row }, _) => {
+                QuickRow::ALL.iter().position(|r| *r == row).unwrap_or(0) as i32
+            }
+            (Phase::Shelf, _) => self.shelf().index as i32,
+            _ => 0,
+        };
+        (self.xmb_target().round() as i32, row)
+    }
+
+    /// Seconds into the start-up animation, while it plays.
+    pub fn xmb_intro_clock(&self) -> Option<f32> {
+        self.xmb_intro_secs()
     }
 
     /// Whether the bar is only drifting: on its own screens, left alone a moment, nothing
@@ -299,6 +338,7 @@ impl App {
                 match self.state.xmb_wave {
                     0 => "Original",
                     1 => "Classic",
+                    3 => "Modern",
                     _ => "Wallpaper",
                 }
                 .to_string(),
@@ -363,7 +403,12 @@ impl App {
                 return (c, at);
             }
             QuickRow::XmbWave => {
-                return texts(&["Original", "Classic", "Wallpaper"], self.state.xmb_wave.into())
+                let at = match self.state.xmb_wave {
+                    3 => 2,
+                    2 => 3,
+                    w => w.into(),
+                };
+                return texts(&["Original", "Classic", "Modern", "Wallpaper"], at)
             }
             QuickRow::XmbDateFormat => {
                 return texts(&slot_ui::XMB_DATE_FORMATS, self.state.xmb_date_format.into())
@@ -1228,9 +1273,14 @@ impl App {
     }
 
     fn xmb_intro_art(&self, t: f32) -> slot_ui::XmbIntro {
+        self.xmb_intro_art_at(t, 1.0)
+    }
+
+    fn xmb_intro_art_at(&self, t: f32, modern: f32) -> slot_ui::XmbIntro {
         slot_ui::XmbIntro {
             canvas: self.canvas(),
             t,
+            modern,
             backdrop: self.xmb_backdrop(1.0),
             flare: self.xmb_art.flare,
             glint: self.xmb_art.glint,
@@ -1254,7 +1304,9 @@ impl App {
     pub(super) fn xmb_draw_outro(&self, out: &mut Vec<Draw>) {
         let left = self.act_at.saturating_sub(self.now()) as f32 / 1000.0;
         let p = 1.0 - (left / slot_ui::XMB_OUTRO_SECS).clamp(0.0, 1.0);
-        self.xmb_intro_art(slot_ui::xmb_outro_t(p)).draw(out);
+        // Modern's wave fades down into the dark as the bar goes.
+        let modern = 1.0 - ease(ramp(p, 0.1, 0.7));
+        self.xmb_intro_art_at(slot_ui::xmb_outro_t(p), modern).draw(out);
         let ui = 1.0 - ease(ramp(p, 0.0, 0.15));
         if ui > 0.0 && !matches!(self.phase, Phase::Playing { .. }) {
             let t = self.xmb_textures();

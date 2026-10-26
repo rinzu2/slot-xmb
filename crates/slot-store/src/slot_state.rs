@@ -592,7 +592,7 @@ fn parse(text: &str) -> Option<SlotState> {
             "wallpaper_tint" => wallpaper_tint = WallpaperTint::parse(value),
             "show_recents" => show_recents = flag(value),
             "show_titles" => show_titles = flag(value),
-            "xmb_wave" => xmb_wave = value.parse::<u8>().ok().filter(|v| *v <= 2),
+            "xmb_wave" => xmb_wave = value.parse::<u8>().ok().filter(|v| *v <= 3),
             "xmb_colour" => xmb_colour = value.parse::<u8>().ok().filter(|v| *v <= 64),
             "xmb_labels" => xmb_labels = flag(value),
             "xmb_clock24" => xmb_clock24 = flag(value),

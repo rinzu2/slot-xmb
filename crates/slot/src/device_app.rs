@@ -20,6 +20,8 @@ const LOG_SYNC: Duration = Duration::from_secs(1);
 /// How often the bar is drawn while nothing but its slow waves moves: 20 frames a second, a
 /// third of the work, which keeps the handheld cool on the home screen.
 const CALM_FRAME: Duration = Duration::from_millis(50);
+/// Modern's sparkles drift on even when the bar is still, so it rests at thirty frames.
+const CALM_FRAME_MODERN: Duration = Duration::from_millis(33);
 
 /// How often input is still read between those frames.
 const CALM_POLL: Duration = Duration::from_millis(12);
@@ -187,8 +189,11 @@ pub fn run() {
     step(&mut intro, &mut compositor, &mut surface);
     let mut input = DeviceInput::open(&root);
     slot::boot_time::mark("input");
-    if let Some(intro) = &intro {
+    if let Some(intro) = &mut intro {
         frontend.xmb_intro_played(intro.played_ms());
+        if let Some((scene, booted)) = intro.modern.take() {
+            frontend.adopt_modern(slot::frontend::ModernSync::new(scene, booted));
+        }
     }
     let card = root.clone();
     let _ = std::thread::Builder::new()
@@ -225,7 +230,11 @@ pub fn run() {
             frontend.stop();
             return;
         }
-        if frontend.app().xmb_calm() && last_frame.is_some_and(|at| at.elapsed() < CALM_FRAME) {
+        let calm = match frontend.app().xmb_modern() {
+            true => CALM_FRAME_MODERN,
+            false => CALM_FRAME,
+        };
+        if frontend.app().xmb_calm() && last_frame.is_some_and(|at| at.elapsed() < calm) {
             std::thread::sleep(CALM_POLL);
             continue;
         }
@@ -308,12 +317,17 @@ struct BootIntro {
     title: (slot_gfx::TexId, [f32; 4]),
     foot: slot_gfx::TexId,
     ground: Option<slot_gfx::TexId>,
+    /// Modern's scene, and whether its start has begun, until the frontend takes it on.
+    modern: Option<(slot_ui::xmb_modern::ModernScene, bool)>,
     buf: Vec<u8>,
     draws: Vec<slot_gfx::Draw>,
     last: Option<Instant>,
     /// Where the animation is, in seconds. It follows the clock but never jumps more than a
     /// frame's worth, so a pause in the loading holds the picture rather than skipping on.
     clock: f32,
+    /// Where it was when the Modern scene last moved on.
+    modern_at: f32,
+    utc_offset_min: i32,
 }
 
 impl BootIntro {
@@ -336,7 +350,11 @@ impl BootIntro {
             .unwrap_or(0);
         let wall = now + i64::from(state.utc_offset_min) * 60;
         let colour = slot_ui::xmb_colour_index(state.xmb_colour, wall);
-        let style = state.xmb_wave.min(1);
+        let style = match state.xmb_wave {
+            1 => slot_gfx::STYLE_CLASSIC,
+            3 => slot_gfx::STYLE_MODERN,
+            _ => slot_gfx::STYLE_ORIGINAL,
+        };
         let mut buf = Vec::new();
         slot_ui::xmb_curves_at(style, 0.0, Some(0.0), &mut buf);
         let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
@@ -353,6 +371,15 @@ impl BootIntro {
         let ground = slot::xmb_ground::face(&grounds, colour).map(|f| compositor.create_texture(f.w, f.h, &f.rgba));
         let (f, at) = slot_ui::xmb_title_face(slot_gfx::Canvas::of(window));
         let title = (compositor.create_texture(f.w, f.h, &f.rgba), at);
+        let modern = (style == slot_gfx::STYLE_MODERN).then(|| {
+            use slot_ui::xmb_modern::{xmb_modern_picture, ModernColour, ModernScene};
+            let mut scene = ModernScene::new(None);
+            if state.xmb_colour != 0 {
+                let face = slot::xmb_ground::face(&grounds, colour).map(|f| (f.w, f.h, &f.rgba[..]));
+                scene.set_colour(ModernColour::Picture(xmb_modern_picture(colour, face)));
+            }
+            (scene, false)
+        });
         Some(BootIntro {
             started: Instant::now(),
             volume: state.volume,
@@ -366,10 +393,13 @@ impl BootIntro {
             title,
             foot,
             ground,
+            modern,
             buf,
             draws: Vec::new(),
             last: None,
             clock: 0.0,
+            modern_at: 0.0,
+            utc_offset_min: i32::from(state.utc_offset_min),
         })
     }
 
@@ -406,6 +436,28 @@ impl BootIntro {
         }
         self.last = Some(Instant::now());
         let t = self.clock;
+        if let Some((scene, booted)) = &mut self.modern {
+            if !*booted && t >= slot_ui::XMB_MODERN_START {
+                scene.boot();
+                *booted = true;
+            }
+            let wall = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0)
+                + self.utc_offset_min as f64 * 60.0;
+            let (w, h) = self.window;
+            let dt = (t - self.modern_at) as f64;
+            self.modern_at = t;
+            scene.advance(
+                dt,
+                slot_ui::xmb_modern::Wall::of(wall),
+                &[],
+                None,
+                w as f64 / h.max(1) as f64,
+            );
+            compositor.set_modern(scene.frame());
+        }
         slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
         let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
         compositor.update_texture(self.curves, w, h, &self.buf);
@@ -428,6 +480,7 @@ impl BootIntro {
             theme: slot_ui::xmb_swatch(self.colour).map(|v| v as f32 / 255.0),
             title: Some(self.title),
             foot: Some(self.foot),
+            modern: 1.0,
         }
         .draw(&mut self.draws);
         if loading && t > slot_ui::XMB_INTRO_BAR {

@@ -20,6 +20,9 @@ pub const BACKDROP_ROWS: usize = 8;
 /// trailing off one side and a soft shadow on the other.
 pub const STYLE_ORIGINAL: u8 = 0;
 pub const STYLE_CLASSIC: u8 = 1;
+/// The PS3's wave, drawn by the Modern pass (`crate::modern`) from the frame the compositor
+/// last took; Original stands in until there is one.
+pub const STYLE_MODERN: u8 = 2;
 
 /// Rows of the curve texture: row 0 holds Original's sheet edge and veil edge; rows 1 and 2 hold
 /// Classic's four waves, two a row.

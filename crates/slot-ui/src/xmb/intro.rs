@@ -51,6 +51,9 @@ pub const XMB_INTRO_CLOCK: f32 = 3.6;
 pub const XMB_INTRO_BAR: f32 = 3.9;
 pub const XMB_INTRO_END: f32 = 4.5;
 pub const XMB_OUTRO_SECS: f32 = 1.3;
+/// When Modern's own start, the PS3's, begins under the boot picture: from black, as the
+/// console's does, the hairlines giving way as its wave comes up.
+pub const XMB_MODERN_START: f32 = 0.6;
 
 fn ramp(x: f32, from: f32, span: f32) -> f32 {
     ((x - from) / span).clamp(0.0, 1.0)
@@ -338,6 +341,8 @@ pub struct XmbIntro {
     pub title: Option<(TexId, [f32; 4])>,
     /// `xmb_foot_face` in the theme's pale colour.
     pub foot: Option<TexId>,
+    /// How much of a Modern background shows: 1 as it starts, falling as the bar switches off.
+    pub modern: f32,
 }
 
 impl XmbIntro {
@@ -351,6 +356,23 @@ impl XmbIntro {
             h,
             colour: [0.0, 0.0, 0.0, 1.0],
         });
+        let modern = self.backdrop.is_some_and(|b| b.style == slot_gfx::STYLE_MODERN);
+        if modern {
+            // The PS3's start draws itself, from black; the scene is told when it began.
+            if let (Some(mut b), true) = (self.backdrop, t >= XMB_MODERN_START && self.modern > 0.0) {
+                b.alpha = self.modern.clamp(0.0, 1.0);
+                out.push(Draw::Backdrop(b));
+            }
+            let fade = 1.0 - ease(ramp(t, 1.0, 1.3));
+            for (y, rh, mut colour) in hairlines(h, t.min(1.4), self.theme) {
+                colour[3] *= fade;
+                if colour[3] > 0.0 {
+                    out.push(Draw::Rect { x: 0.0, y, w, h: rh, colour });
+                }
+            }
+            self.draw_title(out);
+            return;
+        }
         if let (Some(mut b), Some(shape)) = (self.backdrop, xmb_intro_shape(t)) {
             b.shape = shape;
             out.push(Draw::Backdrop(b));
@@ -395,8 +417,12 @@ impl XmbIntro {
                 colour,
             });
         }
-        // The lettering, over the lines.
-        let a = xmb_title_alpha(t);
+        self.draw_title(out);
+    }
+
+    /// The lettering, over the lines.
+    fn draw_title(&self, out: &mut Vec<Draw>) {
+        let a = xmb_title_alpha(self.t);
         if let (Some((tex, [x, y, tw, th])), true) = (self.title, a > 0.0) {
             out.push(Draw::Tex {
                 x,

@@ -40,6 +40,10 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 <img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu, dark while the game is paused">
 </p>
 <p align="center">
+<img src=".github/resources/xmb/41_modern_cyan.png" width="48%" alt="Modern, the PS3's wave and sparkles, in Cyan">
+<img src=".github/resources/xmb/45_modern_night.png" width="48%" alt="Modern by the month, at night">
+</p>
+<p align="center">
 <img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings, in Gold with Classic waves">
 <img src=".github/resources/xmb/boot.png" width="48%" alt="The boot picture">
 </p>
@@ -56,6 +60,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 **Waves and colours**
 
 - **Original** and **Classic** wave backgrounds, both drawn on the GPU.
+- **Modern**: the PS3's wave and its sparkles, ported from [faquino's reverse engineering](https://github.com/faquino/PlayStation-3-XMB) of the console's own code. It follows the time of day from dawn to night, and the sparkles drift as you move along the bar. On By Month it uses the PS3's own colour for each month, and any other colour gives it the bar's colour as its backdrop.
 - 34 background colours fitted from screenshots of a real PSP, each with its own edge glow and shading. There's also a By Month option that changes the colour each month.
 - A **Wallpaper** background replaces the waves with your own picture.
 
@@ -64,12 +69,13 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 - On power-up the screen shows a boot picture that reads "slot. XMB".
 - The start-up animation takes over from that picture without a jump. The lines brighten, colour spreads out from them, and the waves grow out of them.
 - Games and settings load while the animation plays. If loading takes longer, the waves stay up with a pulsing ring at the lower left.
+- With Modern, the PS3's own start-up plays instead: from black, its wave rises through the boot picture's lines and the colour comes up behind it.
 - Switching off plays the animation in reverse.
 - Booting straight back into a game you left running skips the animation and goes from the boot picture to the game.
 
 **Settings**
 
-- Theme Settings: Background, Color (or Wallpaper), Game Icons, and Dark Pause Menu.
+- Theme Settings: Background (Original, Classic, Modern or Wallpaper), Color (or Wallpaper), Game Icons, and Dark Pause Menu.
 - Date & Time Settings: a PSP-style clock editor, date format, 12- or 24-hour time, and time zone.
 - Volume, brightness and screen-temperature gauges in the PSP's style.
 - About sits at the bottom of Settings and scrolls.
@@ -131,11 +137,12 @@ XMB_SHOTS=shots cargo test --release -p slot \
 
 - **[slot](https://github.com/BrandonKowalski/slot) by [Brandon Kowalski](https://github.com/BrandonKowalski).** This fork is built on slot v1.9.0 and wouldn't exist without it. Read the [slot guide](https://slot-cfw.fyi) and the [upstream changelog](https://github.com/BrandonKowalski/slot/blob/main/CHANGELOG.md), and if you enjoy slot, you can [support Brandon on Ko-fi](https://ko-fi.com/kwallbmoc).
 - [BaseOS](https://github.com/pvaibhav/BaseOS), the system slot runs on.
+- **Modern** is ported from [PlayStation-3-XMB](https://github.com/faquino/PlayStation-3-XMB) by faquino, a fork of Mart's [linkev/PlayStation-3-XMB](https://github.com/linkev/PlayStation-3-XMB), and from [Nagare](https://github.com/bungholesurfers/Nagare), its Rust port. faquino worked out the wave, the sparkles and the backdrop from the console's firmware in RPCS3. Their code is MIT licensed; the notice is in [`crates/slot-ui/src/xmb/modern/LICENSE-MIT`](crates/slot-ui/src/xmb/modern/LICENSE-MIT).
 - Fonts: [Saira](https://github.com/Omnibus-Type/Saira) and [Montserrat](https://github.com/JulietaUla/Montserrat), both under the SIL Open Font License.
-- The look is modelled on Sony's PSP XrossMediaBar. PlayStation, PSP and XrossMediaBar are trademarks of Sony. This fork contains no Sony code, artwork or audio.
+- The look is modelled on Sony's PSP and PS3 XrossMediaBar. PlayStation, PSP and XrossMediaBar are trademarks of Sony. This fork contains no Sony code, artwork or audio. Modern's PS3 month colours and sparkle tints are numbers fitted to the firmware's textures, which faquino's project ships, not the textures themselves.
 
 # License
 
-GPL-3.0, the same as upstream. See [LICENSE](LICENSE).
+GPL-3.0, the same as upstream. See [LICENSE](LICENSE). The Modern background's ported code keeps its MIT licence ([`LICENSE-MIT`](crates/slot-ui/src/xmb/modern/LICENSE-MIT)).
 
 slot is the work of Brandon Kowalski. This fork modifies slot v1.9.0 (commit `20703ed`): the changes, made in October 2026, add the `xmb` feature and its art, fonts, animation and settings. The full history of both is in this repository's commits.

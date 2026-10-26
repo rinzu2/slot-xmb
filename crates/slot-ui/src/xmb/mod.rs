@@ -6,6 +6,7 @@
 mod art;
 mod ground;
 mod intro;
+pub mod modern;
 mod palette;
 mod text;
 mod waves;
@@ -22,7 +23,7 @@ pub use text::{xmb_text_face, XmbSize};
 pub use ground::{xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS};
 pub use intro::{
     xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face, XmbIntro,
-    xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
+    xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_MODERN_START, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
     XMB_OUTRO_SECS,
 };
 use text::{XMB_TEXT_EXTRA, XMB_TEXT_PAD};

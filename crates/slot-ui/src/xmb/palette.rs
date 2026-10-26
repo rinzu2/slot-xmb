@@ -493,37 +493,6 @@ pub fn month_of(wall_secs: i64) -> u32 {
     (if mp < 10 { mp + 3 } else { mp - 9 }) as u32
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn months_from_wall_time() {
-        assert_eq!(month_of(0), 1);
-        assert_eq!(month_of(1_792_900_800), 10);
-        assert_eq!(month_of(1_709_208_000), 2);
-        assert_eq!(month_of(-1), 12);
-    }
-
-    #[test]
-    fn the_clock_reads_like_the_handhelds() {
-        assert_eq!(xmb_clock_text(1_792_900_800, 0, false), "10/25 4:00 AM");
-        assert_eq!(xmb_clock_text(1_792_900_800 + 9 * 3600 + 5 * 60, 0, false), "10/25 1:05 PM");
-        assert_eq!(xmb_clock_text(1_792_900_800 - 4 * 3600, 0, false), "10/25 12:00 AM");
-        assert_eq!(xmb_clock_text(1_792_900_800 + 9 * 3600 + 5 * 60, 1, true), "25/10 13:05");
-        assert_eq!(xmb_date_time_text(1_792_900_800, 2, true), "2026/10/25 4:00");
-        assert_eq!(xmb_date_time_text(1_709_208_000, 0, false), "02/29/2024 12:00 PM");
-    }
-
-    #[test]
-    fn october_is_the_orange_the_handheld_shows() {
-        // 2026-10-25: By Month lands on Orange.
-        let c = xmb_colour_index(0, 1_792_900_800);
-        assert_eq!(XMB_PALETTE[(c - 1) as usize].0, "Orange");
-        assert_eq!(xmb_colour_index(34, 0), 34);
-        assert_eq!(xmb_colour_index(200, 0), XMB_COLOUR_COUNT as u32);
-    }
-}
 
 /// Per colour, Original's edges, measured with the colours: the glow below the upper edge (rgb
 /// added, then its length in pixels of a 480-line screen), the glow below the lower edge, and the
@@ -598,3 +567,35 @@ pub const XMB_EDGES: [BackdropEdges; 34] = [
     // Red
     [[-0.024, -0.015, 0.033, 24.000], [0.000, 0.000, 0.000, 64.000], [0.200, 0.000, 0.000, 0.000]],
 ];
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn months_from_wall_time() {
+        assert_eq!(month_of(0), 1);
+        assert_eq!(month_of(1_792_900_800), 10);
+        assert_eq!(month_of(1_709_208_000), 2);
+        assert_eq!(month_of(-1), 12);
+    }
+
+    #[test]
+    fn the_clock_reads_like_the_handhelds() {
+        assert_eq!(xmb_clock_text(1_792_900_800, 0, false), "10/25 4:00 AM");
+        assert_eq!(xmb_clock_text(1_792_900_800 + 9 * 3600 + 5 * 60, 0, false), "10/25 1:05 PM");
+        assert_eq!(xmb_clock_text(1_792_900_800 - 4 * 3600, 0, false), "10/25 12:00 AM");
+        assert_eq!(xmb_clock_text(1_792_900_800 + 9 * 3600 + 5 * 60, 1, true), "25/10 13:05");
+        assert_eq!(xmb_date_time_text(1_792_900_800, 2, true), "2026/10/25 4:00");
+        assert_eq!(xmb_date_time_text(1_709_208_000, 0, false), "02/29/2024 12:00 PM");
+    }
+
+    #[test]
+    fn october_is_the_orange_the_handheld_shows() {
+        // 2026-10-25: By Month lands on Orange.
+        let c = xmb_colour_index(0, 1_792_900_800);
+        assert_eq!(XMB_PALETTE[(c - 1) as usize].0, "Orange");
+        assert_eq!(xmb_colour_index(34, 0), 34);
+        assert_eq!(xmb_colour_index(200, 0), XMB_COLOUR_COUNT as u32);
+    }
+}

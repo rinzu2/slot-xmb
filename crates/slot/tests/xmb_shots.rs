@@ -18,6 +18,54 @@ use slot_ui::{cart_face, Draw, Icon, QuickRow, HUD_ICON_PX};
 struct Soft {
     tex: Vec<(u32, u32, Vec<u8>)>,
     shots: Option<PathBuf>,
+    /// The Modern background, run as the frontend runs it and drawn by the GPU programs the
+    /// handheld runs, through whatever GLES 2 the machine has.
+    modern: Option<slot::frontend::ModernSync>,
+    gl: std::cell::RefCell<Option<GlModern>>,
+}
+
+struct GlModern {
+    // Dropped before the context it was made in.
+    compositor: slot_gfx::Compositor,
+    curves: TexId,
+    _surface: slot_gfx::HeadlessSurface,
+}
+
+impl GlModern {
+    fn new() -> Option<Self> {
+        let surface = slot_gfx::HeadlessSurface::new().ok()?;
+        let mut compositor = slot_gfx::Compositor::new(&surface).ok()?;
+        let (w, h) = (slot_gfx::BACKDROP_COLS, slot_gfx::BACKDROP_ROWS);
+        let curves = compositor.create_texture_nearest(w as u32, h as u32, &vec![0; w * h * 4]);
+        Some(GlModern { compositor, curves, _surface: surface })
+    }
+
+    /// The frame over black, top row first.
+    fn render(&mut self, frame: &slot_gfx::ModernFrame, w: usize, h: usize) -> Vec<[f32; 3]> {
+        let c = &mut self.compositor;
+        c.fit((w as u32, h as u32));
+        c.set_modern(frame);
+        c.begin_frame();
+        c.draw_list(&[Draw::Backdrop(slot_gfx::Backdrop {
+            curves: self.curves,
+            style: slot_gfx::STYLE_MODERN,
+            colours: [[0; 3]; 15],
+            edges: [[0.0; 4]; 3],
+            shape: slot_gfx::BACKDROP_PLAIN,
+            alpha: 1.0,
+            ground: None,
+        })]);
+        let (fw, fh) = c.frame_size();
+        let rgba = c.read_frame();
+        let mut out = vec![[0.0f32; 3]; w * h];
+        for y in 0..h.min(fh as usize) {
+            for x in 0..w.min(fw as usize) {
+                let o = ((fh as usize - 1 - y) * fw as usize + x) * 4;
+                out[y * w + x] = [rgba[o], rgba[o + 1], rgba[o + 2]].map(|v| v as f32 / 255.0);
+            }
+        }
+        out
+    }
 }
 
 impl Soft {
@@ -29,6 +77,8 @@ impl Soft {
         Soft {
             tex: Vec::new(),
             shots,
+            modern: None,
+            gl: std::cell::RefCell::new(None),
         }
     }
 
@@ -57,6 +107,12 @@ impl Soft {
     }
 
     fn sync(&mut self, app: &mut App) {
+        if app.xmb_modern() && app.xmb_visible() {
+            let m = self.modern.get_or_insert_with(|| {
+                slot::frontend::ModernSync::new(slot_ui::xmb_modern::ModernScene::new(Some(5)), false)
+            });
+            m.drive(app, None);
+        }
         let mut art = slot_ui::XmbArt::default();
         for icon in slot_ui::XmbIcon::ALL {
             let f = slot_ui::xmb_icon_face(icon);
@@ -188,6 +244,22 @@ impl Soft {
                 alpha,
                 uv,
             } => (x, y, w, h, Some(tex), alpha, uv, [1.0; 4]),
+            Draw::Backdrop(b) if b.style == slot_gfx::STYLE_MODERN => {
+                let mut gl = self.gl.borrow_mut();
+                if gl.is_none() {
+                    *gl = GlModern::new();
+                }
+                let (Some(g), Some(m)) = (gl.as_mut(), self.modern.as_ref()) else {
+                    return;
+                };
+                let pic = g.render(m.frame(), w, h);
+                for (p, c) in px.iter_mut().zip(pic) {
+                    for k in 0..3 {
+                        p[k] = p[k] * (1.0 - b.alpha) + c[k] * b.alpha;
+                    }
+                }
+                return;
+            }
             Draw::Backdrop(b) => {
                 let curves = &self.tex[tex_index(b.curves)].2;
                 for (i, p) in px.iter_mut().enumerate() {
@@ -843,4 +915,143 @@ fn the_dark_pause_menu_can_be_turned_off() {
         .expect("a backdrop behind the menu");
     assert_eq!(b.colours, slot_ui::xmb_backdrop_colours(20), "off: the bar's own colour");
     assert!(SlotState::default().xmb_pause_dark, "on by default");
+}
+
+/// A clock offset that puts the bar's local time at `hour`, so that Modern's day shows the same
+/// whenever the test runs.
+fn offset_for(hour: i64) -> i16 {
+    let utc = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64;
+    let now_min = (utc / 60).rem_euclid(24 * 60);
+    let mut off = hour * 60 - now_min;
+    while off > 14 * 60 {
+        off -= 24 * 60;
+    }
+    while off < -12 * 60 {
+        off += 24 * 60;
+    }
+    off as i16
+}
+
+#[test]
+fn modern_waves_on_the_bar() {
+    let day = offset_for(13);
+    for (name, colour) in [
+        ("40_modern_month", 0u8),
+        ("41_modern_cyan", 29),
+        ("42_modern_rose", 20),
+        ("43_modern_indigo", 9),
+        ("44_modern_gold", 21),
+    ] {
+        let (_d, mut a, mut soft) = home(SlotState {
+            xmb_wave: 3,
+            xmb_colour: colour,
+            utc_offset_min: day,
+            ..SlotState::default()
+        });
+        assert_eq!(a.xmb_wave_style(), slot_gfx::STYLE_MODERN);
+        assert!(a.xmb_modern());
+        for _ in 0..2 {
+            press(&mut a, Btn::Down);
+        }
+        soft.settle(&mut a, 120);
+        soft.shot(&mut a, name);
+    }
+    // Night, by the month.
+    let (_d, mut n, mut soft) = home(SlotState {
+        xmb_wave: 3,
+        utc_offset_min: offset_for(23),
+        ..SlotState::default()
+    });
+    soft.settle(&mut n, 120);
+    soft.shot(&mut n, "45_modern_night");
+    // Theme Settings: Modern sits between Classic and the wallpaper.
+    a_theme_lists_modern();
+}
+
+fn a_theme_lists_modern() {
+    let (_d, mut a, mut soft) = home(SlotState {
+        xmb_wave: 1,
+        utc_offset_min: offset_for(13),
+        ..SlotState::default()
+    });
+    a.apply(Action::QuickMenu);
+    for _ in 0..3 {
+        press(&mut a, Btn::Up);
+    }
+    assert_eq!(a.quick_menu(), Some(QuickRow::XmbTheme));
+    press(&mut a, Btn::A);
+    assert_eq!(a.quick_menu(), Some(QuickRow::XmbWave));
+    press(&mut a, Btn::A);
+    press(&mut a, Btn::Down);
+    assert!(a.xmb_modern(), "down from Classic is Modern");
+    soft.settle(&mut a, 60);
+    soft.shot(&mut a, "46_modern_theme");
+    press(&mut a, Btn::Down);
+    assert!(!a.xmb_modern(), "and after it the wallpaper");
+    press(&mut a, Btn::Up);
+    press(&mut a, Btn::A);
+    assert!(a.xmb_modern());
+}
+
+#[test]
+fn modern_starts_from_the_boot_picture_and_switches_off_into_the_dark() {
+    let (_d, mut a, mut soft) = home_starting(SlotState {
+        xmb_wave: 3,
+        utc_offset_min: offset_for(13),
+        ..SlotState::default()
+    });
+    let start = a.now() + 10;
+    a.tick_ms(start);
+    for ms in [30, 630, 1030, 1430, 1830, 2230, 2630, 3030, 3530, 4030, 4530, 5530, 6530, 7530] {
+        a.tick_ms(start + ms);
+        soft.shot_bare(&mut a, &format!("47_modern_intro_{ms:04}"));
+    }
+    let (_d2, mut o, mut soft2) = home(SlotState {
+        xmb_wave: 3,
+        utc_offset_min: offset_for(13),
+        ..SlotState::default()
+    });
+    soft2.settle(&mut o, 120);
+    let off = o.now() + 10;
+    o.tick_ms(off);
+    o.on_battery(slot_power::Battery {
+        percent: 0,
+        charge: slot_power::Charge::Discharging,
+    });
+    for ms in [100, 400, 700, 1000, 1250] {
+        o.tick_ms(off + ms);
+        soft2.shot_bare(&mut o, &format!("48_modern_off_{ms:04}"));
+    }
+}
+
+#[test]
+fn modern_goes_dark_behind_a_paused_game() {
+    let d = root(SlotState::default());
+    write_slot_state(
+        d.path(),
+        &SlotState {
+            cart: Some("Golden Sun".into()),
+            clock_set: true,
+            xmb_wave: 3,
+            xmb_colour: 20,
+            utc_offset_min: offset_for(13),
+            ..SlotState::default()
+        },
+    )
+    .unwrap();
+    let mut a = App::boot(d.path());
+    a.set_panel((640, 480));
+    a.set_snapshot(common::StubSnapshot::boxed());
+    a.on_core_ready();
+    a.set_game_ready(true);
+    let mut soft = Soft::new();
+    soft.faces(&mut a);
+    soft.settle(&mut a, 60);
+    a.apply(Action::QuickMenu);
+    assert_eq!(a.xmb_modern_look(), slot::app::ModernLook::Dark);
+    soft.settle(&mut a, 60);
+    soft.shot(&mut a, "49_modern_paused");
 }

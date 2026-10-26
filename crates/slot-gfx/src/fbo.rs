@@ -1,4 +1,5 @@
 use crate::backdrop::BackdropPass;
+use crate::modern::{ModernFrame, ModernPass};
 use crate::draw::{Draw, Sprites, TexId};
 use crate::grade::blue_light_gain;
 use crate::pipeline::GamePass;
@@ -32,6 +33,9 @@ pub struct Compositor {
     game: GamePass,
     sprites: Sprites,
     backdrop: BackdropPass,
+    /// Made the first time a Modern frame comes, so that the other backgrounds pay nothing.
+    modern: Option<ModernPass>,
+    modern_failed: bool,
     game_bezel: Option<TexId>,
     sp_frame: bool,
     turn: Option<Turn>,
@@ -83,6 +87,8 @@ impl Compositor {
                 game: GamePass::new()?,
                 sprites: Sprites::new()?,
                 backdrop: BackdropPass::new()?,
+                modern: None,
+                modern_failed: false,
                 game_bezel: None,
                 sp_frame: true,
                 turn: None,
@@ -142,8 +148,18 @@ impl Compositor {
                         self.in_game_rect(|c| c.game.draw_still(tex, &c.quad));
                     }
                 }
-                Draw::Backdrop(b) => {
+                Draw::Backdrop(b) if b.style == crate::backdrop::STYLE_MODERN && self.modern.is_some() => {
                     self.sprites.draw(&items[from..i], &self.quad);
+                    if let Some(m) = &mut self.modern {
+                        m.draw(self.fbo, self.size, b.alpha, &self.quad);
+                    }
+                }
+                Draw::Backdrop(mut b) => {
+                    self.sprites.draw(&items[from..i], &self.quad);
+                    // Modern, before the scene has handed a frame: Original's waves stand in.
+                    if b.style == crate::backdrop::STYLE_MODERN {
+                        b.style = crate::backdrop::STYLE_ORIGINAL;
+                    }
                     if let Some(curves) = self.sprites.source(b.curves) {
                         let ground = b.ground.and_then(|g| self.sprites.source(g));
                         self.backdrop
@@ -160,6 +176,26 @@ impl Compositor {
             from = i + 1;
         }
         self.sprites.draw(&items[from..], &self.quad);
+    }
+
+    /// Takes the Modern background's next frame, for the backdrop of `STYLE_MODERN` that follows.
+    pub fn set_modern(&mut self, frame: &ModernFrame) {
+        if self.modern.is_none() && !self.modern_failed {
+            match ModernPass::new() {
+                Ok(m) => self.modern = Some(m),
+                Err(e) => {
+                    eprintln!("slot: modern background: {e}");
+                    self.modern_failed = true;
+                }
+            }
+            unsafe {
+                gl::BindFramebuffer(gl::FRAMEBUFFER, self.fbo);
+                gl::Viewport(0, 0, self.size.0 as i32, self.size.1 as i32);
+            }
+        }
+        if let Some(m) = &mut self.modern {
+            m.set_frame(frame);
+        }
     }
 
     pub fn create_texture(&mut self, w: u32, h: u32, rgba: &[u8]) -> TexId {
