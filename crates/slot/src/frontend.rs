@@ -139,6 +139,10 @@ struct XmbSync {
     flare_rgb: Option<[u8; 3]>,
     /// The canvas the start-up's lettering was rendered for.
     title_for: Option<(u32, u32)>,
+    /// The handheld's background pictures from the card (empty when there are none), and the
+    /// colour whose picture is uploaded.
+    grounds: Option<Vec<slot_ui::CartFace>>,
+    ground_for: Option<u32>,
     texts: std::collections::HashMap<String, slot_ui::XmbText>,
     spare: Vec<TexId>,
     last: Vec<String>,
@@ -180,6 +184,22 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
             None => xs.art.foot = Some(compositor.create_texture(f.w, f.h, &f.rgba)),
         }
         xs.flare_rgb = Some(theme);
+    }
+    if xs.grounds.is_none() {
+        xs.grounds = Some(app.root().map(crate::xmb_ground::load).unwrap_or_default());
+    }
+    let colour = app.xmb_colour();
+    if xs.ground_for != Some(colour) {
+        xs.ground_for = Some(colour);
+        let face = xs.grounds.as_deref().and_then(|g| crate::xmb_ground::face(g, colour));
+        xs.art.ground = match (face, xs.art.ground) {
+            (Some(f), Some(id)) => {
+                compositor.update_texture(id, f.w, f.h, &f.rgba);
+                Some(id)
+            }
+            (Some(f), None) => Some(compositor.create_texture(f.w, f.h, &f.rgba)),
+            (None, _) => None,
+        };
     }
     let canvas = app.canvas();
     let size = (canvas.w as u32, canvas.h as u32);

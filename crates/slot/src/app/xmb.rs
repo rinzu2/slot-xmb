@@ -749,6 +749,7 @@ impl App {
             edges: slot_ui::xmb_backdrop_edges(self.xmb_colour()),
             shape: slot_gfx::BACKDROP_PLAIN,
             alpha,
+            ground: self.xmb_art.ground,
         })
     }
 

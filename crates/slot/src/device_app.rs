@@ -307,6 +307,7 @@ struct BootIntro {
     ring: slot_gfx::TexId,
     title: (slot_gfx::TexId, [f32; 4]),
     foot: slot_gfx::TexId,
+    ground: Option<slot_gfx::TexId>,
     buf: Vec<u8>,
     draws: Vec<slot_gfx::Draw>,
     last: Option<Instant>,
@@ -348,6 +349,8 @@ impl BootIntro {
         let foot = compositor.create_texture(f.w, f.h, &f.rgba);
         let f = slot_ui::xmb_ring_face();
         let ring = compositor.create_texture(f.w, f.h, &f.rgba);
+        let grounds = slot::xmb_ground::load(root);
+        let ground = slot::xmb_ground::face(&grounds, colour).map(|f| compositor.create_texture(f.w, f.h, &f.rgba));
         let (f, at) = slot_ui::xmb_title_face(slot_gfx::Canvas::of(window));
         let title = (compositor.create_texture(f.w, f.h, &f.rgba), at);
         Some(BootIntro {
@@ -362,6 +365,7 @@ impl BootIntro {
             ring,
             title,
             foot,
+            ground,
             buf,
             draws: Vec::new(),
             last: None,
@@ -417,6 +421,7 @@ impl BootIntro {
                 edges: slot_ui::xmb_backdrop_edges(self.colour),
                 shape: slot_gfx::BACKDROP_PLAIN,
                 alpha: 1.0,
+                ground: self.ground,
             }),
             flare: Some(self.flare),
             glint: Some(self.glint),

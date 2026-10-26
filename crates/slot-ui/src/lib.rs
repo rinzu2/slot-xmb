@@ -112,7 +112,7 @@ pub use xmb::{
     xmb_curves_at, xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face,
     XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
     XMB_OUTRO_SECS,
-    xmb_cart_halo_face, xmb_halo_index, XMB_HALOS, xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_swatch, xmb_text_face, Xmb,
+    xmb_cart_halo_face, xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS, xmb_halo_index, XMB_HALOS, xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_swatch, xmb_text_face, Xmb,
     XmbArt, XmbCat, XmbClockEdit, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,
     XmbText, XMB_COLOUR_COUNT, XMB_MONTHS, XMB_PALETTE, XMB_WAVE_CLASSIC, XMB_WAVE_ORIGINAL,
 };

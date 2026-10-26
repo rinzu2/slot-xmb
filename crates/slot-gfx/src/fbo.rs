@@ -145,8 +145,9 @@ impl Compositor {
                 Draw::Backdrop(b) => {
                     self.sprites.draw(&items[from..i], &self.quad);
                     if let Some(curves) = self.sprites.source(b.curves) {
+                        let ground = b.ground.and_then(|g| self.sprites.source(g));
                         self.backdrop
-                            .draw(&b, curves, Canvas::of(self.window), &self.quad);
+                            .draw(&b, curves, ground, Canvas::of(self.window), &self.quad);
                     }
                 }
                 Draw::Capture => {

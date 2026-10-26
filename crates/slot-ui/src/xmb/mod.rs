@@ -4,6 +4,7 @@
 //! Everything is drawn from original shapes, an open-licensed font and a procedural background.
 
 mod art;
+mod ground;
 mod intro;
 mod palette;
 mod text;
@@ -18,6 +19,7 @@ pub use palette::{
     XMB_PALETTE,
 };
 pub use text::{xmb_text_face, XmbSize};
+pub use ground::{xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS};
 pub use intro::{
     xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face, XmbIntro,
     xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
@@ -50,6 +52,8 @@ pub struct XmbArt {
     pub foot: Option<TexId>,
     /// `xmb_cart_halo_face` for each cart outline, with its margins.
     pub halos: [Option<(TexId, [f32; 2])>; XMB_HALOS],
+    /// The handheld's background picture for the current colour, when it is on the card.
+    pub ground: Option<TexId>,
 }
 
 /// A rendered line of text and its size.

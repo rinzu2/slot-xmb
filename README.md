@@ -86,6 +86,15 @@ Download the latest release from this fork's [releases page](../../releases/late
 
 The boot picture is written to the device the first time the new build runs. It shows from the following boot onwards.
 
+## Your PSP's own background colours (optional)
+
+The colours are fitted from screenshots of a PSP. If you have a PSP or PS Vita with custom firmware, you can give Original waves your console's exact backgrounds. Copy these files from `flash0:/vsh/resource/` on your console to `System/xmb/` on the SD card:
+
+- `13-27.bmp`
+- `01-12_03g.bmp`, or `01-12.bmp` on a PSP-1000 or PSP-2000
+
+They aren't included here, and nothing changes if they're missing.
+
 ## Sounds (optional)
 
 The bar plays short sound effects if it finds them on the SD card. **They aren't included in this repo**, so you need to supply your own. Each must be a 16-bit PCM WAV, at any sample rate, mono or stereo.

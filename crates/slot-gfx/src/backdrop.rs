@@ -48,13 +48,17 @@ pub struct Backdrop {
     /// (0 none, 1 a plain field of the colour), and how soft the band's edges are.
     pub shape: [f32; 4],
     pub alpha: f32,
+    /// The handheld's own background picture for the colour, stretched over the screen, when it
+    /// is on the card: Original draws its ground from it instead of from `colours`.
+    pub ground: Option<TexId>,
 }
 
-/// Original's edges, per colour: the glow trailing below the upper edge (rgb, then its length
-/// in pixels of a 480-line screen), the same below the lower edge, then how much of the sheet's
-/// colour the upper edge brings (the rest comes with the lower) and how soft both edges are (half
+/// Original's edges, per colour: the glow trailing below the main wave's edge (rgb, then its
+/// length in pixels of a 480-line screen), the same below the veil's, then how much the veil
+/// behind the main wave shows (its opacity) and how soft both edges are (half
 /// the width of their step, in the same pixels; 3 when zero), then a saturation for the whole
-/// picture (1 when zero).
+/// picture (1 when zero) and, at 1, the older layering by height instead (the third value is then
+/// how much of the sheet the upper edge brings).
 pub type BackdropEdges = [[f32; 4]; 3];
 
 /// The picture as it is: not squeezed, brightened or smoothed.
@@ -95,6 +99,8 @@ uniform float u_alpha;
 uniform vec3 u_c[15];
 uniform vec4 u_e[3];
 uniform vec4 u_shape;
+uniform sampler2D u_ground;
+uniform float u_has_ground;
 
 vec4 texel(float row) {
     return texture2D(u_curves, vec2(v_uv.x, (row + 0.5) / 8.0));
@@ -138,22 +144,37 @@ void main() {
         float d1 = py - dec(e.rg) * u_size.y;
         float d2 = py - dec(e.ba) * u_size.y;
         vec3 ground = mix(top, side(u_c[3], u_c[4], u_c[5], u), clamp((v - 0.11) / 0.44, 0.0, 1.0));
+        if (u_has_ground > 0.5) {
+            // The handheld's picture, a touch brighter on its screen than in the file.
+            ground = clamp(texture2D(u_ground, v_uv).rgb * 1.046 + 0.04, 0.0, 1.0);
+        }
         plain = ground;
         float em = min(dec(e.rg), dec(e.ba));
         vec3 sheet = mix(side(u_c[6], u_c[7], u_c[8], u), side(u_c[9], u_c[10], u_c[11], u),
             clamp((v - em - 0.055) / max(0.92 - em, 0.05), 0.0, 1.0));
-        // Distances below the upper edge and below the lower one.
-        float du = max(d1, d2);
-        float dl = min(d1, d2);
+        // Two sheets: the main wave in front, solid, and the veil behind it, faint, whichever
+        // of the two is higher at this point. `u_e[2].x` is how much the veil shows.
         // Each edge is a soft step, three pixels either side unless the colour asks for more.
         float soft = max(u_e[2].y, 3.0) * k;
-        float cu = smoothstep(-soft, soft, du);
-        float cl = smoothstep(-soft, soft, dl);
-        // Two sheets: the upper edge brings part of the sheet's colour, the lower the rest.
-        // Below each edge some colours trail a glow of their own.
-        col = mix(ground, sheet, cl + u_e[2].x * (cu - cl));
-        col += u_e[0].rgb * exp(-max(du, 0.0) / (u_e[0].w * k)) * cu;
-        col += u_e[1].rgb * exp(-max(dl, 0.0) / (u_e[1].w * k)) * cl;
+        float cm = smoothstep(-soft, soft, d1);
+        float cv = smoothstep(-soft, soft, d2);
+        float veil = u_e[2].x;
+        if (u_e[2].w > 0.5) {
+            // The older layering, kept for a colour tuned with it: the upper edge brings part of
+            // the sheet's colour, the lower the rest, each trailing its glow.
+            float du = max(d1, d2);
+            float dl = min(d1, d2);
+            float cu = smoothstep(-soft, soft, du);
+            float cl = smoothstep(-soft, soft, dl);
+            col = mix(ground, sheet, cl + veil * (cu - cl));
+            col += u_e[0].rgb * exp(-max(du, 0.0) / (u_e[0].w * k)) * cu;
+            col += u_e[1].rgb * exp(-max(dl, 0.0) / (u_e[1].w * k)) * cl;
+        } else {
+            col = mix(ground, sheet, 1.0 - (1.0 - cm) * (1.0 - veil * cv));
+            // Below each edge some colours trail a glow of their own; the veil's is as faint as it.
+            col += u_e[0].rgb * exp(-max(d1, 0.0) / (u_e[0].w * k)) * cm;
+            col += u_e[1].rgb * exp(-max(d2, 0.0) / (u_e[1].w * k)) * cv * veil * (1.0 - cm);
+        }
         col = clamp(col, 0.0, 1.0);
         // Some colours run a little less saturated than measured, as this screen is vivid.
         if (u_e[2].z > 0.0) {
@@ -258,13 +279,26 @@ fn shade_plain(
             side(c, 3, u),
             ((v - em - 0.055) / (0.92 - em).max(0.05)).clamp(0.0, 1.0),
         );
-        let (du, dl) = (d1.max(d2), d1.min(d2));
         let soft = e[2][1].max(3.0) * k;
-        let cu = smoothstep(-soft, soft, du);
-        let cl = smoothstep(-soft, soft, dl);
-        let col = mix3(ground, sheet, cl + e[2][0] * (cu - cl));
-        let gu = (-du.max(0.0) / (e[0][3] * k)).exp() * cu;
-        let gl = (-dl.max(0.0) / (e[1][3] * k)).exp() * cl;
+        let cm = smoothstep(-soft, soft, d1);
+        let cv = smoothstep(-soft, soft, d2);
+        let veil = e[2][0];
+        let (col, gu, gl) = if e[2][3] > 0.5 {
+            // As the shader: the older layering, by height.
+            let (du, dl) = (d1.max(d2), d1.min(d2));
+            let (cu, cl) = (smoothstep(-soft, soft, du), smoothstep(-soft, soft, dl));
+            (
+                mix3(ground, sheet, cl + veil * (cu - cl)),
+                (-du.max(0.0) / (e[0][3] * k)).exp() * cu,
+                (-dl.max(0.0) / (e[1][3] * k)).exp() * cl,
+            )
+        } else {
+            (
+                mix3(ground, sheet, 1.0 - (1.0 - cm) * (1.0 - veil * cv)),
+                (-d1.max(0.0) / (e[0][3] * k)).exp() * cm,
+                (-d2.max(0.0) / (e[1][3] * k)).exp() * cv * veil * (1.0 - cm),
+            )
+        };
         let col = [0, 1, 2].map(|i| (col[i] + e[0][i] * gu + e[1][i] * gl).clamp(0.0, 1.0));
         // As the shader: some colours a little less saturated.
         let col = match e[2][2] > 0.0 {
@@ -300,6 +334,7 @@ pub(crate) struct BackdropPass {
     u_c: gl::types::GLint,
     u_e: gl::types::GLint,
     u_shape: gl::types::GLint,
+    u_has_ground: gl::types::GLint,
 }
 
 impl BackdropPass {
@@ -308,6 +343,7 @@ impl BackdropPass {
         unsafe {
             gl::UseProgram(prog);
             gl::Uniform1i(crate::gl::uniform_location(prog, "u_curves"), 0);
+            gl::Uniform1i(crate::gl::uniform_location(prog, "u_ground"), 1);
         }
         Ok(BackdropPass {
             prog,
@@ -319,10 +355,18 @@ impl BackdropPass {
             u_c: crate::gl::uniform_location(prog, "u_c"),
             u_e: crate::gl::uniform_location(prog, "u_e"),
             u_shape: crate::gl::uniform_location(prog, "u_shape"),
+            u_has_ground: crate::gl::uniform_location(prog, "u_has_ground"),
         })
     }
 
-    pub fn draw(&self, b: &Backdrop, curves: gl::types::GLuint, canvas: Canvas, quad: &Quad) {
+    pub fn draw(
+        &self,
+        b: &Backdrop,
+        curves: gl::types::GLuint,
+        ground: Option<gl::types::GLuint>,
+        canvas: Canvas,
+        quad: &Quad,
+    ) {
         let flat: Vec<f32> = b.colours.iter().flatten().map(|v| *v as f32 / 255.0).collect();
         unsafe {
             if b.alpha < 1.0 {
@@ -330,6 +374,11 @@ impl BackdropPass {
                 gl::BlendFunc(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
             }
             gl::UseProgram(self.prog);
+            if let Some(ground) = ground {
+                gl::ActiveTexture(gl::TEXTURE1);
+                gl::BindTexture(gl::TEXTURE_2D, ground);
+            }
+            gl::Uniform1f(self.u_has_ground, if ground.is_some() { 1.0 } else { 0.0 });
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, curves);
             gl::Uniform4f(self.u_rect, 0.0, 0.0, canvas.w, canvas.h);
