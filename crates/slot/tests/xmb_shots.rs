@@ -484,10 +484,26 @@ fn levels_show_as_segments() {
         .filter(|d| matches!(d, Draw::Rect { w, h, .. } if *h <= 6.0 && *w <= 6.0))
         .count();
     assert!(bars >= 2 && dots >= 2, "{bars} bars and {dots} dots");
-    // Brightness has fewer steps, so a shorter gauge.
+    // A tick for every press: from silence, one press lights exactly one of twenty.
     for _ in 0..40 {
         a.apply(Action::VolumeDown);
     }
+    a.apply(Action::VolumeUp);
+    let out = soft.shot_now(&mut a, "13c_volume_one");
+    let white = |d: &&Draw| matches!(d, Draw::Rect { colour, .. } if colour[0] == 1.0 && colour[3] > 0.0);
+    let lit = out
+        .iter()
+        .filter(white)
+        .filter(|d| matches!(d, Draw::Rect { h, .. } if (20.0..26.0).contains(h)))
+        .count();
+    let unlit = out
+        .iter()
+        .filter(white)
+        .filter(|d| matches!(d, Draw::Rect { w, h, .. } if *h <= 6.0 && *w <= 6.0))
+        .count();
+    assert_eq!((lit, unlit), (1, 19), "one press from silence is one tick of twenty");
+    a.apply(Action::VolumeDown);
+    // Brightness has fewer steps, so a shorter gauge.
     soft.settle(&mut a, 200);
     a.apply(Action::BrightnessDown);
     soft.shot_now(&mut a, "13b_brightness");

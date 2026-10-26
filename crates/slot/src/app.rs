@@ -64,7 +64,7 @@ const FOOTER_SLIDE_S: f32 = POWER_ON_S;
 const BLANK_WARM_S: f32 = 1.5;
 const BLANK_DIM: f32 = 0.1;
 
-const VOLUME_STEP: u8 = 5;
+use slot_store::VOLUME_STEP;
 
 const AUTOSAVE_MS: Millis = 60_000;
 const RESUME_MS: Millis = 300_000;

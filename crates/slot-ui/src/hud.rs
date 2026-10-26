@@ -1,5 +1,5 @@
 use slot_gfx::{Canvas, Draw, TexId, OUT_H};
-use slot_store::{BLUE_LIGHT_MAX, BRIGHTNESS_MAX, VOLUME_MAX};
+use slot_store::{BLUE_LIGHT_MAX, BRIGHTNESS_MAX, VOLUME_MAX, VOLUME_STEP};
 
 use crate::icon::icon_box;
 use crate::toast::toast_rect;
@@ -78,6 +78,15 @@ impl HudKind {
             HudKind::BlueLight => BLUE_LIGHT_MAX,
             HudKind::Volume => VOLUME_MAX,
             HudKind::Rewind => 100,
+        }
+    }
+
+    /// How far one press moves the level, where the buttons step it.
+    fn step(self) -> u8 {
+        match self {
+            HudKind::Volume => VOLUME_STEP,
+            HudKind::Brightness | HudKind::BlueLight => 1,
+            HudKind::Rewind => 0,
         }
     }
 }
@@ -338,10 +347,17 @@ impl Hud {
     fn draw_segments(&self, canvas: Canvas, alpha: f32, out: &mut Vec<Draw>) {
         let (w, h) = (canvas.w, canvas.h);
         let s = h / OUT_H as f32;
-        // At most thirty ticks, as the handheld shows; finer scales are shared out over them.
+        // A tick for every press of the buttons, so each press lights or puts out exactly one;
+        // a scale with no buttons is shared out over at most thirty, as the handheld shows.
         let full = self.kind.max().max(1) as usize;
-        let max = full.min(30);
-        let lit = (self.value.min(self.kind.max()) as usize * max).div_ceil(full);
+        let value = self.value.min(self.kind.max()) as usize;
+        let (max, lit) = match self.kind.step() as usize {
+            0 => {
+                let max = full.min(30);
+                (max, (value * max).div_ceil(full))
+            }
+            step => (full.div_ceil(step), value.div_ceil(step)),
+        };
         let lit = if self.muted && self.kind == HudKind::Volume { 0 } else { lit };
         let y = (h * 0.906).round();
         let (iw, ih) = icon_box(HUD_ICON_PX);

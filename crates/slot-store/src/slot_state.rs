@@ -7,6 +7,8 @@ use crate::platform::Platform;
 pub const BRIGHTNESS_MAX: u8 = 9;
 pub const BLUE_LIGHT_MAX: u8 = 9;
 pub const VOLUME_MAX: u8 = 100;
+/// How far one press of a volume button moves the volume.
+pub const VOLUME_STEP: u8 = 5;
 
 pub const UTC_OFFSET_MIN: i16 = -720;
 pub const UTC_OFFSET_MAX: i16 = 840;
