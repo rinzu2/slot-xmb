@@ -692,3 +692,32 @@ fn start_up_and_switch_off() {
         soft3.shot_bare(&mut o, &format!("32_off_{ms:04}"));
     }
 }
+
+#[test]
+fn shoulders_jump_a_letter_and_the_place_survives_a_stop() {
+    let (d, mut a, mut soft) = home(SlotState::default());
+    let first = a.selected_stem().map(str::to_string);
+    a.apply(Action::NextShelf);
+    let next = a.selected_stem().map(str::to_string);
+    assert_ne!(first, next, "R1 moves to the next letter");
+    assert_ne!(
+        first.as_deref().map(slot_store::initial),
+        next.as_deref().map(slot_store::initial),
+        "and lands on a different letter"
+    );
+    assert!(a.quick_menu().is_none(), "R1 stays on the games");
+    a.apply(Action::PreviousShelf);
+    assert_eq!(a.selected_stem().map(str::to_string), first, "L1 goes back a letter");
+    // Hover a game, go into Settings, and be stopped from outside: the game is remembered.
+    for _ in 0..3 {
+        press(&mut a, Btn::Down);
+    }
+    let want = a.selected_stem().map(str::to_string);
+    press(&mut a, Btn::Left);
+    assert!(a.quick_menu().is_some());
+    soft.settle(&mut a, 2);
+    let st = slot_store::read_slot_state(d.path());
+    assert_eq!(st.shelf_cart.map(|c| c.stem), want, "remembered on the way into Settings");
+    let (b, _c) = app_booting_at(d.path(), CLOCK_IS_SET);
+    assert_eq!(b.selected_stem().map(str::to_string), want);
+}

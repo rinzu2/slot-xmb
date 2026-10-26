@@ -49,7 +49,7 @@ pub struct Backdrop {
     pub shape: [f32; 4],
     pub alpha: f32,
     /// The handheld's own background picture for the colour, stretched over the screen, when it
-    /// is on the card: Original draws its ground from it instead of from `colours`.
+    /// is on the card: both styles draw their ground from it instead of from `colours`.
     pub ground: Option<TexId>,
 }
 
@@ -137,6 +137,9 @@ void main() {
     float inside = 1.0 - smoothstep(u_shape.x - u_shape.w, u_shape.x + u_shape.w, abs(v - 0.5));
     float py = v * u_size.y;
     vec3 top = side(u_c[0], u_c[1], u_c[2], u);
+    // The handheld's own picture for the colour, when it is on the card, a touch brighter on its
+    // screen than in the file: the ground under both styles' waves.
+    vec3 picture = clamp(texture2D(u_ground, v_uv).rgb * 1.046 + 0.04, 0.0, 1.0);
     vec3 col;
     vec3 plain;
     if (u_style < 0.5) {
@@ -145,8 +148,7 @@ void main() {
         float d2 = py - dec(e.ba) * u_size.y;
         vec3 ground = mix(top, side(u_c[3], u_c[4], u_c[5], u), clamp((v - 0.11) / 0.44, 0.0, 1.0));
         if (u_has_ground > 0.5) {
-            // The handheld's picture, a touch brighter on its screen than in the file.
-            ground = clamp(texture2D(u_ground, v_uv).rgb * 1.046 + 0.04, 0.0, 1.0);
+            ground = picture;
         }
         plain = ground;
         float em = min(dec(e.rg), dec(e.ba));
@@ -182,6 +184,9 @@ void main() {
         }
     } else {
         col = mix(top, side(u_c[12], u_c[13], u_c[14], u), smoothstep(0.11, 0.97, v));
+        if (u_has_ground > 0.5) {
+            col = picture;
+        }
         plain = col;
         for (int i = 0; i < 2; i++) {
             vec4 l = texel(1.0 + float(i));

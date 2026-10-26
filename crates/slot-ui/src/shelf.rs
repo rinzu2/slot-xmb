@@ -247,6 +247,14 @@ impl Shelf {
         self.jump(-1);
     }
 
+    /// As `jump_next_letter` and `jump_prev_letter`, but the column glides the whole way to the
+    /// new letter instead of snapping to within a cart of it.
+    pub fn glide_letter(&mut self, dir: i32) {
+        let scroll = self.scroll;
+        self.jump(dir);
+        self.scroll = scroll;
+    }
+
     fn start_of_letter(&self, from: usize) -> usize {
         let n = self.carts.len();
         let letter = slot_store::initial(&self.carts[from].stem);

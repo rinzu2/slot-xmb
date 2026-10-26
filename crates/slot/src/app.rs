@@ -914,9 +914,10 @@ impl App {
 
     fn jump_letter(&mut self, dir: i32) {
         let before = self.shelf().index;
-        match dir > 0 {
-            true => self.shelf_mut().jump_next_letter(),
-            false => self.shelf_mut().jump_prev_letter(),
+        match (XMB, dir > 0) {
+            (true, _) => self.shelf_mut().glide_letter(dir),
+            (false, true) => self.shelf_mut().jump_next_letter(),
+            (false, false) => self.shelf_mut().jump_prev_letter(),
         }
         if self.shelf().index == before {
             return;
@@ -965,6 +966,13 @@ impl App {
             .iter()
             .position(|c| c.platform == cart.platform && c.stem == cart.stem)?;
         Some((at, i))
+    }
+
+    /// Saves which game is hovered, for a stop from outside (the system shutting slot down).
+    pub fn remember_place(&mut self) {
+        if !matches!(self.phase, Phase::Playing { .. } | Phase::Polaroids { .. }) {
+            self.remember_shelf();
+        }
     }
 
     fn remember_shelf(&mut self) {
@@ -2649,9 +2657,11 @@ impl App {
                 }
                 _ if self.core_picker.is_some() => self.core_picker_input(action),
                 // Cross-media bar: left and right walk the categories (Settings is leftmost),
-                // up and down the games, and the carousel's shoulder keys jump a letter.
-                Action::PreviousShelf | Action::GbaDown(Btn::Left) if XMB => self.xmb_step(-1),
-                Action::NextShelf | Action::GbaDown(Btn::Right) if XMB => self.xmb_step(1),
+                // up and down the games, and the shoulder keys jump a letter back or on.
+                Action::PreviousShelf if XMB => self.jump_letter(-1),
+                Action::NextShelf if XMB => self.jump_letter(1),
+                Action::GbaDown(Btn::Left) if XMB => self.xmb_step(-1),
+                Action::GbaDown(Btn::Right) if XMB => self.xmb_step(1),
                 Action::PreviousShelf => self.switch_shelf(-1),
                 Action::NextShelf => self.switch_shelf(1),
                 Action::Favorite => self.toggle_favorite(),
@@ -2738,6 +2748,10 @@ impl App {
     }
 
     fn open_quick_menu(&mut self) {
+        // Remember the game hovered, so a shutdown from Settings comes back to it.
+        if XMB && matches!(self.phase, Phase::Shelf) {
+            self.remember_shelf();
+        }
         self.xmb_pick = None;
         self.xmb_options = None;
         self.phase = Phase::QuickMenu {
@@ -5142,6 +5156,7 @@ impl App {
         if matches!(self.phase, Phase::Doze { .. }) {
             return;
         }
+        self.remember_place();
         self.state_writer.flush();
         self.flush_resume();
         let cart = match &mut self.phase {

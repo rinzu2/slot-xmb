@@ -50,6 +50,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 
 - Categories run across the screen and items run down it, with the PSP's sizes, spacing, highlight glow and the small arrow beside an open item.
 - Game names show only on the game under the cursor.
+- L1 and R1 jump back or on a letter in the game list, gliding there smoothly.
 - The clock and battery sit at the top right and hide whenever a side menu is open. A battery percentage can be shown next to the battery icon.
 
 **Waves and colours**
@@ -88,7 +89,7 @@ The boot picture is written to the device the first time the new build runs. It 
 
 ## Your PSP's own background colours (optional)
 
-The colours are fitted from screenshots of a PSP. If you have a PSP or PS Vita with custom firmware, you can give Original waves your console's exact backgrounds. Copy these files from `flash0:/vsh/resource/` on your console to `System/xmb/` on the SD card:
+The colours are fitted from screenshots of a PSP. If you have a PSP or PS Vita with custom firmware, you can give both wave styles your console's exact backgrounds. Copy these files from `flash0:/vsh/resource/` on your console to `System/xmb/` on the SD card:
 
 - `13-27.bmp`
 - `01-12_03g.bmp`, or `01-12.bmp` on a PSP-1000 or PSP-2000
