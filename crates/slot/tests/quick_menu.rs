@@ -419,7 +419,11 @@ fn each_platform_keeps_its_own_shader_wraps_and_starts_on_grid_and_simpletex() {
     );
     for (btn, want, shown) in [
         (Btn::Right, Shader::Dot, QuickValue::Dot),
+        (Btn::Right, Shader::SharpBilinear, QuickValue::SharpBilinear),
+        (Btn::Right, Shader::LcdGridV2, QuickValue::LcdGridV2),
         (Btn::Right, Shader::Off, QuickValue::Off),
+        (Btn::Left, Shader::LcdGridV2, QuickValue::LcdGridV2),
+        (Btn::Left, Shader::SharpBilinear, QuickValue::SharpBilinear),
         (Btn::Left, Shader::Dot, QuickValue::Dot),
         (Btn::Left, Shader::Grid, QuickValue::Grid),
         (Btn::Left, Shader::Lcd3x, QuickValue::Lcd3x),
@@ -808,7 +812,10 @@ fn the_legend_says_change_on_a_value_row_and_open_on_a_row_that_opens() {
     let (_d, mut a, _) = on_carousel();
     fake_faces(&mut a);
     a.apply(Action::QuickMenu);
-    for row in QuickRow::MAIN.into_iter().filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock)) {
+    for row in QuickRow::MAIN
+        .into_iter()
+        .filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock))
+    {
         assert_eq!(a.quick_menu(), Some(row));
         let out = frame(&a);
         assert!(drawn(&out, 400), "no B BACK on {row:?}");
@@ -866,7 +873,10 @@ fn the_pointer_stands_left_of_the_selected_row_and_only_it_is_lit() {
     let (_d, mut a, _) = on_carousel();
     fake_faces(&mut a);
     a.apply(Action::QuickMenu);
-    for row in QuickRow::MAIN.into_iter().filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock)) {
+    for row in QuickRow::MAIN
+        .into_iter()
+        .filter(|r| !matches!(r, QuickRow::XmbTheme | QuickRow::XmbClock))
+    {
         let out = frame(&a);
         let pointers: Vec<_> = out
             .iter()
@@ -1323,7 +1333,10 @@ fn gba_frames_from_the_card_show_only_on_a_four_by_three_panel() {
     std::fs::write(d.path().join("Bezels/GBA/Classic.png"), b"png").unwrap();
     assert!(a.bezel_files(Platform::Gba).is_empty());
     a.set_panel((640, 480));
-    assert_eq!(a.bezel_files(Platform::Gba), vec!["Classic.png".to_string()]);
+    assert_eq!(
+        a.bezel_files(Platform::Gba),
+        vec!["Classic.png".to_string()]
+    );
     open_at(&mut a, QuickRow::GbaBezel);
     press(&mut a, Btn::Right);
     assert_eq!(

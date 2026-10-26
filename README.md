@@ -75,6 +75,10 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 - About sits at the bottom of Settings and scrolls.
 - While a game is paused, the in-game menu goes dark whatever the colour, in either wave style, with the game showing only faintly behind it, inspired by the PS3. Turn off **Dark Pause Menu** in Theme Settings to keep your colour there instead.
 
+**Game Boy Advance shaders**
+
+- Two extra screen shaders for GBA games, alongside slot's own: **Sharp Bilinear**, which keeps every game pixel the same size and crisp at full screen, and **LCD Grid v2**, which gives a soft LCD look with faint subpixels and gaps between pixels. Game Boy and Game Boy Color keep slot's usual list.
+
 **Power use**
 
 - When nothing is moving on the home screen, the bar draws at 20 frames per second instead of 60, so the device runs cooler.

@@ -8,16 +8,17 @@ use slot_power::{Battery, Charge, LedState, LidPolicy, Power, RepairResult};
 use slot_retro::LinkChannel;
 use slot_store::{
     format_stamp, parse_stamp, read_slot_state, scan, write_slot_state, BezelPick, Cart, Core,
-    GbColors, Platform, Recent, Shader, ShotDir, ShotEntry, SlotState, StateEntry, StateRing, WallpaperPick,
-    WallpaperTint, BLUE_LIGHT_MAX, BRIGHTNESS_MAX, FF_SPEEDS, RING_MAX, VOLUME_MAX,
+    GbColors, Platform, Recent, Shader, ShotDir, ShotEntry, SlotState, StateEntry, StateRing,
+    WallpaperPick, WallpaperTint, BLUE_LIGHT_MAX, BRIGHTNESS_MAX, FF_SPEEDS, RING_MAX, VOLUME_MAX,
 };
 use slot_ui::{
     board_from, board_zoom, draw_empty_slot, draw_footer, draw_ground, draw_slot_name,
     draw_sticker, ease, footer_ink, grown, lid_at, lid_from, lift_of, on_board, repeat_gap,
     shelf_cart_at, ClockPicker, Draw, FfState, GbShell, Hud, HudKind, Icon, LinkBadge, Millis,
     Placed, Polaroids, PowerChoice, QuickMenu, QuickMenuFaces, QuickRow, QuickValue, Refusal,
-    Shelf, ShotMode, ShotViewer, SlotChrome, TexId, Toast, CART_W, CHIP_H, CHIP_U, CHIP_V, CHIP_W, HINT_EDGE, HOP_LIFT,
-    MOUTH_H, REPEAT_DELAY_MS, SHADOW_H, SHADOW_W, SOCKET_H, SOCKET_U, SOCKET_V, SOCKET_W, TURN_PAD,
+    Shelf, ShotMode, ShotViewer, SlotChrome, TexId, Toast, CART_W, CHIP_H, CHIP_U, CHIP_V, CHIP_W,
+    HINT_EDGE, HOP_LIFT, MOUTH_H, REPEAT_DELAY_MS, SHADOW_H, SHADOW_W, SOCKET_H, SOCKET_U,
+    SOCKET_V, SOCKET_W, TURN_PAD,
 };
 
 use crate::audio::Sfx;
@@ -1127,7 +1128,11 @@ impl App {
                 let at = std::time::Instant::now();
                 let mut shots = dir.list().unwrap_or_default();
                 shots.retain(|e| !removing.contains(&e.path));
-                eprintln!("slot: shots: listed {} in {} ms", shots.len(), at.elapsed().as_millis());
+                eprintln!(
+                    "slot: shots: listed {} in {} ms",
+                    shots.len(),
+                    at.elapsed().as_millis()
+                );
                 let _ = tx.send(shots);
             });
         match spawned {
@@ -2600,9 +2605,7 @@ impl App {
                 Action::GbaDown(Btn::Down) => picker.down(),
                 Action::GbaDown(Btn::A) | Action::Insert => self.confirm_clock(),
                 Action::GbaDown(Btn::B) if *from_menu => {
-                    self.phase = Phase::QuickMenu {
-                        row: clock_row(),
-                    }
+                    self.phase = Phase::QuickMenu { row: clock_row() }
                 }
                 _ => {}
             }
@@ -3290,6 +3293,8 @@ impl App {
             Shader::Grid => Toast::ShaderGrid,
             Shader::Dot => Toast::ShaderDot,
             Shader::Simpletex => Toast::ShaderSimpletex,
+            Shader::SharpBilinear => Toast::ShaderSharpBilinear,
+            Shader::LcdGridV2 => Toast::ShaderLcdGridV2,
         };
         self.persist();
         self.hud.toast(said, self.now());
@@ -4198,7 +4203,9 @@ impl App {
             };
         }
         match &self.phase {
-            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. } if XMB => {
+            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. }
+                if XMB =>
+            {
                 self.draw_xmb(1.0, out);
             }
             Phase::SetClock {
@@ -4391,9 +4398,12 @@ impl App {
         if self.shot_wanted && matches!(self.phase, Phase::Playing { .. }) && self.game_visible() {
             out.push(Draw::Capture);
         }
-        if let (Some(row), Phase::Playing { .. }, true, true) =
-            (self.in_game_menu_shown(), &self.phase, self.screen >= 1.0, XMB)
-        {
+        if let (Some(row), Phase::Playing { .. }, true, true) = (
+            self.in_game_menu_shown(),
+            &self.phase,
+            self.screen >= 1.0,
+            XMB,
+        ) {
             self.draw_xmb_in_game(row, out);
         } else if let (Some(row), Phase::Playing { .. }, true) =
             (self.in_game_menu_shown(), &self.phase, self.screen >= 1.0)
@@ -6137,8 +6147,14 @@ impl App {
             return None;
         }
         Some(match self.shots_to_delete() {
-            1 => ("Delete this screenshot?".to_string(), "It cannot be brought back."),
-            n => (format!("Delete {n} screenshots?"), "They cannot be brought back."),
+            1 => (
+                "Delete this screenshot?".to_string(),
+                "It cannot be brought back.",
+            ),
+            n => (
+                format!("Delete {n} screenshots?"),
+                "They cannot be brought back.",
+            ),
         })
     }
 
@@ -6317,6 +6333,8 @@ fn shader_value(shader: Shader) -> QuickValue {
         Shader::Grid => QuickValue::Grid,
         Shader::Dot => QuickValue::Dot,
         Shader::Simpletex => QuickValue::Simpletex,
+        Shader::SharpBilinear => QuickValue::SharpBilinear,
+        Shader::LcdGridV2 => QuickValue::LcdGridV2,
     }
 }
 

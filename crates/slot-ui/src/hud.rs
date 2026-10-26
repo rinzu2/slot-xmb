@@ -358,7 +358,11 @@ impl Hud {
             }
             step => (full.div_ceil(step), value.div_ceil(step)),
         };
-        let lit = if self.muted && self.kind == HudKind::Volume { 0 } else { lit };
+        let lit = if self.muted && self.kind == HudKind::Volume {
+            0
+        } else {
+            lit
+        };
         let y = (h * 0.906).round();
         let (iw, ih) = icon_box(HUD_ICON_PX);
         let scale = (h * 0.07) / ih as f32;

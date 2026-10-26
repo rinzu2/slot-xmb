@@ -66,18 +66,63 @@ uniform vec4 u_pic;
 varying vec2 v_uv;
 const vec3 offsets = vec3(3.141592654) * vec3(1.0 / 2.0, 1.0 / 2.0 - 2.0 / 3.0, 1.0 / 2.0 - 4.0 / 3.0);
 const vec3 luma_coeff = vec3(0.2126, 0.7152, 0.0722);
+const float LCD_GAIN = 1.25;
+const float LCD_GAP = 0.08;
+const float LCD_TINT = 0.3;
 vec2 grid_band(vec2 x) {
     return floor(x) / 3.0 + min(fract(x), vec2(1.0 / 3.0));
 }
 float dot_weight(vec2 f, vec2 o, float bloom) {
     return exp(-4.0 * length(f - (o + vec2(0.5))) * bloom);
 }
+vec3 texel_at(vec2 t) {
+    vec2 lo = floor(u_pic.xy * u_src + 0.5);
+    vec2 hi = floor(u_pic.zw * u_src - 0.5);
+    return texture2D(u_game, (clamp(t, lo, hi) + 0.5) / u_src).rgb;
+}
+float span(float a0, float a1, float b0, float b1) {
+    return max(0.0, min(a1, b1) - max(a0, b0));
+}
 void main() {
     vec2 uv = u_uv.xy + v_uv * u_uv.zw;
     vec2 f = fract(uv * u_src);
     vec3 c = texture2D(u_game, uv).rgb;
     bool inside = all(greaterThanEqual(uv, u_pic.xy)) && all(lessThan(uv, u_pic.zw));
+    vec2 per_texel = (u_rect.zw * u_fbo) / (u_uv.zw * u_src);
     if (!inside) {
+    } else if (u_mode > 5.5) {
+        vec2 w = 1.0 / max(per_texel, vec2(1.0));
+        vec2 tx = uv * u_src;
+        vec2 n = floor(tx);
+        vec2 x = tx - n;
+        float g = LCD_GAP;
+        float l = (1.0 - 2.0 * g) / 3.0;
+        vec3 sum = vec3(0.0);
+        for (int j = -1; j <= 1; j++) {
+            float yo = x.y - float(j);
+            float hy = span(yo - 0.5 * w.y, yo + 0.5 * w.y, g, 1.0 - g) / w.y;
+            for (int i = -1; i <= 1; i++) {
+                float xo = x.x - float(i);
+                float x0 = xo - 0.5 * w.x;
+                float x1 = xo + 0.5 * w.x;
+                vec3 sub = vec3(span(x0, x1, g, g + l),
+                                span(x0, x1, g + l, g + 2.0 * l),
+                                span(x0, x1, g + 2.0 * l, 1.0 - g));
+                vec3 hx = mix(vec3(span(x0, x1, g, 1.0 - g)), 3.0 * sub, LCD_TINT) / w.x;
+                vec3 lin = pow(texel_at(n + vec2(float(i), float(j))), vec3(2.2));
+                sum += lin * hx * hy;
+            }
+        }
+        c = pow(clamp(sum * LCD_GAIN, 0.0, 1.0), vec3(1.0 / 2.2));
+    } else if (u_mode > 4.5) {
+        vec2 tx = uv * u_src;
+        vec2 cd = fract(tx) - 0.5;
+        vec2 region = 0.5 - 0.5 / max(per_texel, vec2(1.0));
+        vec2 p = floor(tx) + (cd - clamp(cd, -region, region)) * per_texel;
+        vec2 i = floor(p);
+        vec2 t = p - i;
+        c = mix(mix(texel_at(i), texel_at(i + vec2(1.0, 0.0)), t.x),
+                mix(texel_at(i + vec2(0.0, 1.0)), texel_at(i + vec2(1.0)), t.x), t.y);
     } else if (u_mode > 3.5) {
         c = pow(c, vec3(1.05));
         vec2 d = abs(f - 0.5);

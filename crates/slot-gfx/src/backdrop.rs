@@ -231,8 +231,16 @@ fn side(c: &[[f32; 3]; 15], part: usize, u: f32) -> [f32; 3] {
         let d = x - a;
         a + 0.5 * (d + (d * d + 0.01).sqrt())
     };
-    let a = mix3(l, m, floor_soft((u - AT_LEFT) / (AT_MIDDLE - AT_LEFT), -0.3));
-    let b = mix3(m, r, ((u - AT_MIDDLE) / (AT_RIGHT - AT_MIDDLE)).clamp(-1.0, 1.06));
+    let a = mix3(
+        l,
+        m,
+        floor_soft((u - AT_LEFT) / (AT_MIDDLE - AT_LEFT), -0.3),
+    );
+    let b = mix3(
+        m,
+        r,
+        ((u - AT_MIDDLE) / (AT_RIGHT - AT_MIDDLE)).clamp(-1.0, 1.06),
+    );
     let v = mix3(a, b, smoothstep(AT_MIDDLE - 0.15, AT_MIDDLE + 0.15, u));
     v.map(|x| x.clamp(0.0, 1.0))
 }
@@ -375,7 +383,12 @@ impl BackdropPass {
         canvas: Canvas,
         quad: &Quad,
     ) {
-        let flat: Vec<f32> = b.colours.iter().flatten().map(|v| *v as f32 / 255.0).collect();
+        let flat: Vec<f32> = b
+            .colours
+            .iter()
+            .flatten()
+            .map(|v| *v as f32 / 255.0)
+            .collect();
         unsafe {
             if b.alpha < 1.0 {
                 gl::Enable(gl::BLEND);

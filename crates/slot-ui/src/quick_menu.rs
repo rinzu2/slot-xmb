@@ -710,6 +710,8 @@ pub enum QuickValue {
     Grid,
     Dot,
     Simpletex,
+    SharpBilinear,
+    LcdGridV2,
     Dark,
     Light,
     Show,
@@ -736,7 +738,7 @@ pub enum QuickValue {
 }
 
 impl QuickValue {
-    pub const ALL: [QuickValue; 33] = [
+    pub const ALL: [QuickValue; 35] = [
         QuickValue::Speed2,
         QuickValue::Speed3,
         QuickValue::Speed4,
@@ -747,6 +749,8 @@ impl QuickValue {
         QuickValue::Grid,
         QuickValue::Dot,
         QuickValue::Simpletex,
+        QuickValue::SharpBilinear,
+        QuickValue::LcdGridV2,
         QuickValue::Dark,
         QuickValue::Light,
         QuickValue::Show,
@@ -809,6 +813,8 @@ impl QuickValue {
             QuickValue::Lcd3x => "LCD3x",
             QuickValue::Grid => "Grid",
             QuickValue::Dot => "Dot",
+            QuickValue::SharpBilinear => "Sharp Bilinear",
+            QuickValue::LcdGridV2 => "LCD Grid v2",
             QuickValue::Simpletex => "Simpletex",
             QuickValue::Dark => "Dark",
             QuickValue::Light => "Light",

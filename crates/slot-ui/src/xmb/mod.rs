@@ -14,17 +14,19 @@ pub use art::{
     xmb_cart_halo_face, xmb_frame_glow_face, xmb_glow_face, xmb_halo_index, xmb_icon_face, XmbIcon,
     XMB_HALOS, XMB_ICONS,
 };
-pub use palette::{
-    month_of, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS, xmb_swatch, XMB_COLOUR_COUNT, XMB_MONTHS,
-    XMB_PALETTE,
-};
-pub use text::{xmb_text_face, XmbSize};
 pub use ground::{xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS};
 pub use intro::{
-    xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face, XmbIntro,
-    xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
+    xmb_boot_picture, xmb_flare_face, xmb_foot_face, xmb_intro_shape, xmb_loading_ring,
+    xmb_outro_t, xmb_pale, xmb_ring_face, xmb_title_alpha, xmb_title_face, XmbIntro, XMB_INTRO_BAR,
+    XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_TITLE, XMB_INTRO_WAVES,
     XMB_OUTRO_SECS,
 };
+pub use palette::{
+    civil, month_of, xmb_backdrop_colours, xmb_backdrop_edges, xmb_clock_text, xmb_colour_index,
+    xmb_date_time_text, xmb_pause_colours, xmb_pause_edges, xmb_swatch, XMB_COLOUR_COUNT,
+    XMB_DATE_FORMATS, XMB_MONTHS, XMB_PALETTE, XMB_TIME_FORMATS,
+};
+pub use text::{xmb_text_face, XmbSize};
 use text::{XMB_TEXT_EXTRA, XMB_TEXT_PAD};
 pub use waves::{classic_lines, original_edges, xmb_curves, xmb_curves_at};
 
@@ -398,7 +400,10 @@ impl Xmb<'_> {
             // The highlighted item glows, breathing slowly: a cover all round its edge.
             if self.sizes.covers && near > 0.5 {
                 let g = (near - 0.5) * 2.0 * (1.0 - nest) * (self.pulse() * 1.35).min(1.0) * a;
-                match row.halo.and_then(|k| self.art.halos.get(k).copied().flatten()) {
+                match row
+                    .halo
+                    .and_then(|k| self.art.halos.get(k).copied().flatten())
+                {
                     // A whole cart: the glow follows its outline exactly.
                     Some((tex, [mx, my])) if g > 0.0 => out.push(Draw::Tex {
                         x: ix - w * mx,
@@ -476,9 +481,23 @@ impl Xmb<'_> {
             }
             if let Some((tex, tw, th)) = row.title {
                 let scale = lerp(0.8, 1.0, near) * s;
-                let half = if self.sizes.covers { w / 2.0 } else { size / 2.0 };
+                let half = if self.sizes.covers {
+                    w / 2.0
+                } else {
+                    size / 2.0
+                };
                 let tx = x + half + TITLE_GAP * s;
-                text(tex, tw, th, scale, tx, y, self.canvas.w - 10.0, title_alpha, out);
+                text(
+                    tex,
+                    tw,
+                    th,
+                    scale,
+                    tx,
+                    y,
+                    self.canvas.w - 10.0,
+                    title_alpha,
+                    out,
+                );
             }
         }
     }
@@ -499,7 +518,13 @@ impl Xmb<'_> {
         };
         if editing {
             // The handheld washes the right of the screen behind the date being set.
-            out.push(rect((w * EDIT_X).round(), 0.0, w - (w * EDIT_X).round(), h, [0.5, 0.5, 0.5, 0.26 * a]));
+            out.push(rect(
+                (w * EDIT_X).round(),
+                0.0,
+                w - (w * EDIT_X).round(),
+                h,
+                [0.5, 0.5, 0.5, 0.26 * a],
+            ));
         }
         for (k, item) in list.items.iter().enumerate() {
             let rel = k as f32 - list.at as f32;
@@ -540,14 +565,24 @@ impl Xmb<'_> {
             }
             let lx = w * LIST_LABEL_X + shift;
             if let Some((tex, tw, th)) = item.label {
-                let room = if lit || !picking { right } else { w * LIST_VALUE_X - 12.0 };
+                let room = if lit || !picking {
+                    right
+                } else {
+                    w * LIST_VALUE_X - 12.0
+                };
                 text(tex, tw, th, s, lx, y, room, alpha, out);
                 if lit && picking {
                     // The opened line is underlined across to the strip, or across the screen
                     // under a date being set.
                     let end = if editing { w * 0.98 } else { right };
                     let uy = (y + th as f32 * s * 0.36).round();
-                    out.push(rect(lx, uy, end - lx, (1.5 * s).max(1.0), [1.0, 1.0, 1.0, 0.85 * a]));
+                    out.push(rect(
+                        lx,
+                        uy,
+                        end - lx,
+                        (1.5 * s).max(1.0),
+                        [1.0, 1.0, 1.0, 0.85 * a],
+                    ));
                 }
             }
             if lit {
@@ -596,7 +631,10 @@ impl Xmb<'_> {
                     [1.0, 1.0, 1.0, 0.28 * a],
                 ));
                 let b = 11.0 * s;
-                for (icon, ay) in [(XmbIcon::Up, y - ph * 0.30 - b - 1.0 * s), (XmbIcon::Down, y + ph * 0.30 + 1.0 * s)] {
+                for (icon, ay) in [
+                    (XmbIcon::Up, y - ph * 0.30 - b - 1.0 * s),
+                    (XmbIcon::Down, y + ph * 0.30 + 1.0 * s),
+                ] {
                     if let Some(tex) = self.icon(icon) {
                         out.push(Draw::Tex {
                             x: (x + pw / 2.0 - b / 2.0).round(),
@@ -630,7 +668,13 @@ impl Xmb<'_> {
             let y = top + rel as f32 * pitch;
             let lit = k == p.at;
             if lit {
-                out.push(rect(x0, y - pitch * 0.42, w - x0, pitch * 0.84, [1.0, 1.0, 1.0, 0.38 * a]));
+                out.push(rect(
+                    x0,
+                    y - pitch * 0.42,
+                    w - x0,
+                    pitch * 0.84,
+                    [1.0, 1.0, 1.0, 0.38 * a],
+                ));
             }
             let alpha = a;
             match entry {
@@ -645,7 +689,12 @@ impl Xmb<'_> {
                         (y - q / 2.0).round(),
                         q,
                         q,
-                        [c[0] as f32 / 255.0, c[1] as f32 / 255.0, c[2] as f32 / 255.0, alpha],
+                        [
+                            c[0] as f32 / 255.0,
+                            c[1] as f32 / 255.0,
+                            c[2] as f32 / 255.0,
+                            alpha,
+                        ],
                     ));
                 }
             }
@@ -681,8 +730,12 @@ impl Xmb<'_> {
                 true => (self.time / 0.6) as u32 % 4,
                 false => (u32::from(percent) * 3).div_ceil(100).min(3),
             };
-            let icon = [XmbIcon::Battery0, XmbIcon::Battery1, XmbIcon::Battery2, XmbIcon::Battery3]
-                [bars as usize];
+            let icon = [
+                XmbIcon::Battery0,
+                XmbIcon::Battery1,
+                XmbIcon::Battery2,
+                XmbIcon::Battery3,
+            ][bars as usize];
             let b = 34.0 * s;
             if let Some(tex) = self.icon(icon) {
                 // The cell sits a touch low in its square so it lines up with the text's ink.
@@ -698,13 +751,33 @@ impl Xmb<'_> {
             right -= b * 0.93 + 6.0 * s;
             if let Some((tex, tw, th)) = self.battery_text {
                 let tw_s = (tw as f32 - XMB_TEXT_EXTRA) * s;
-                text(tex, tw, th, s, right - tw_s - XMB_TEXT_PAD * s, y, w, a, out);
+                text(
+                    tex,
+                    tw,
+                    th,
+                    s,
+                    right - tw_s - XMB_TEXT_PAD * s,
+                    y,
+                    w,
+                    a,
+                    out,
+                );
                 right -= tw_s + 10.0 * s;
             }
         }
         if let Some((tex, tw, th)) = self.clock {
             let tw_s = (tw as f32 - XMB_TEXT_EXTRA) * s;
-            text(tex, tw, th, s, right - tw_s - XMB_TEXT_PAD * s, y, w, a, out);
+            text(
+                tex,
+                tw,
+                th,
+                s,
+                right - tw_s - XMB_TEXT_PAD * s,
+                y,
+                w,
+                a,
+                out,
+            );
         }
     }
 }
@@ -741,7 +814,17 @@ fn nine_slice(tex: TexId, x: f32, y: f32, w: f32, h: f32, m: f32, alpha: f32, ou
 
 /// A line of text with its left edge at `x`, centred on `y`, cut off at `right`.
 #[allow(clippy::too_many_arguments)]
-fn text(tex: TexId, w: u32, h: u32, scale: f32, x: f32, y: f32, right: f32, alpha: f32, out: &mut Vec<Draw>) {
+fn text(
+    tex: TexId,
+    w: u32,
+    h: u32,
+    scale: f32,
+    x: f32,
+    y: f32,
+    right: f32,
+    alpha: f32,
+    out: &mut Vec<Draw>,
+) {
     let (tw, th) = (w as f32 * scale, h as f32 * scale);
     let shown = tw.min(right - x);
     if shown <= 0.0 || tw <= 0.0 {

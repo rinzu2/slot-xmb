@@ -81,7 +81,12 @@ impl Soft {
         let (f, at) = slot_ui::xmb_title_face(app.canvas());
         art.title = Some((self.add(f.w, f.h, f.rgba), at));
         let mut curves = Vec::new();
-        slot_ui::xmb_curves_at(app.xmb_wave_style(), app.xmb_time(), app.xmb_intro_waves(), &mut curves);
+        slot_ui::xmb_curves_at(
+            app.xmb_wave_style(),
+            app.xmb_time(),
+            app.xmb_intro_waves(),
+            &mut curves,
+        );
         art.curves = Some(self.add(
             slot_gfx::BACKDROP_COLS as u32,
             slot_gfx::BACKDROP_ROWS as u32,
@@ -123,7 +128,8 @@ impl Soft {
     fn shot_now(&mut self, app: &mut App, name: &str) -> Vec<Draw> {
         let out = self.frame(app);
         assert!(
-            out.iter().any(|d| matches!(d, Draw::Tex { .. } | Draw::Part { .. })),
+            out.iter()
+                .any(|d| matches!(d, Draw::Tex { .. } | Draw::Part { .. })),
             "{name} drew nothing textured"
         );
         self.write_shot(app, name, &out);
@@ -213,7 +219,11 @@ impl Soft {
                 for (i, p) in px.iter_mut().enumerate() {
                     let (gx, gy) = (i % w, i / w);
                     let check = ((gx / 32) + (gy / 32)) % 2 == 0;
-                    *p = if check { [0.25, 0.55, 0.35] } else { [0.85, 0.75, 0.3] };
+                    *p = if check {
+                        [0.25, 0.55, 0.35]
+                    } else {
+                        [0.85, 0.75, 0.3]
+                    };
                 }
                 return;
             }
@@ -352,7 +362,9 @@ fn game_rows(out: &[Draw]) -> Vec<(f32, f32)> {
         .iter()
         .filter_map(|d| match *d {
             // Faces sit in the column on the left; titles start to their right.
-            Draw::Part { x, y, h, uv, .. } if uv == [0.0, 0.0, 1.0, 1.0] && h > 30.0 && x < 200.0 => {
+            Draw::Part { x, y, h, uv, .. }
+                if uv == [0.0, 0.0, 1.0, 1.0] && h > 30.0 && x < 200.0 =>
+            {
                 Some((y, h))
             }
             _ => None,
@@ -423,7 +435,10 @@ fn home_and_settings() {
     // Back out of Theme Settings and the bar, onto the games.
     press(&mut a, Btn::Left);
     press(&mut a, Btn::Right);
-    assert!(a.quick_menu().is_none(), "Right on the Settings column leaves it");
+    assert!(
+        a.quick_menu().is_none(),
+        "Right on the Settings column leaves it"
+    );
     soft.shot(&mut a, "07_classic_labels");
 
     a.apply(Action::QuickMenu);
@@ -448,12 +463,23 @@ fn scrolling_fast_keeps_the_column_whole() {
     let out = soft.shot_now(&mut a, "10_mid_scroll");
     a.apply(Action::GbaUp(Btn::Down));
     let rows = game_rows(&out);
-    assert!(rows.len() >= 4, "only {} rows on screen mid-scroll", rows.len());
+    assert!(
+        rows.len() >= 4,
+        "only {} rows on screen mid-scroll",
+        rows.len()
+    );
     // Rows below the bar are evenly spaced and in order: no gaps, no pile-ups.
-    let below: Vec<f32> = rows.iter().map(|r| r.0 + r.1 / 2.0).filter(|y| *y > 260.0).collect();
+    let below: Vec<f32> = rows
+        .iter()
+        .map(|r| r.0 + r.1 / 2.0)
+        .filter(|y| *y > 260.0)
+        .collect();
     for pair in below.windows(2) {
         let gap = pair[1] - pair[0];
-        assert!((40.0..140.0).contains(&gap), "uneven rows mid-scroll: {below:?}");
+        assert!(
+            (40.0..140.0).contains(&gap),
+            "uneven rows mid-scroll: {below:?}"
+        );
     }
     soft.shot(&mut a, "11_after_scroll");
 }
@@ -490,7 +516,8 @@ fn levels_show_as_segments() {
     }
     a.apply(Action::VolumeUp);
     let out = soft.shot_now(&mut a, "13c_volume_one");
-    let white = |d: &&Draw| matches!(d, Draw::Rect { colour, .. } if colour[0] == 1.0 && colour[3] > 0.0);
+    let white =
+        |d: &&Draw| matches!(d, Draw::Rect { colour, .. } if colour[0] == 1.0 && colour[3] > 0.0);
     let lit = out
         .iter()
         .filter(white)
@@ -501,7 +528,11 @@ fn levels_show_as_segments() {
         .filter(white)
         .filter(|d| matches!(d, Draw::Rect { w, h, .. } if *h <= 6.0 && *w <= 6.0))
         .count();
-    assert_eq!((lit, unlit), (1, 19), "one press from silence is one tick of twenty");
+    assert_eq!(
+        (lit, unlit),
+        (1, 19),
+        "one press from silence is one tick of twenty"
+    );
     a.apply(Action::VolumeDown);
     // Brightness has fewer steps, so a shorter gauge.
     soft.settle(&mut a, 200);
@@ -535,7 +566,10 @@ fn in_game_menu() {
     assert_eq!(a.in_game_menu(), Some(QuickRow::Settings));
     press(&mut a, Btn::B);
     soft.settle(&mut a, 10);
-    assert!(a.in_game_menu().is_none(), "B on the column closes the menu");
+    assert!(
+        a.in_game_menu().is_none(),
+        "B on the column closes the menu"
+    );
 }
 
 /// Presses Down until the settings land on `row`.
@@ -635,13 +669,22 @@ fn wallpaper_clock_and_levels() {
     down_to(&mut a, QuickRow::ScreenGeneral);
     press(&mut a, Btn::A);
     down_to(&mut a, QuickRow::BlueLight);
-    assert_eq!(a.quick_value(QuickRow::BlueLight), Some(slot_ui::QuickValue::Off));
+    assert_eq!(
+        a.quick_value(QuickRow::BlueLight),
+        Some(slot_ui::QuickValue::Off)
+    );
     press(&mut a, Btn::A);
     press(&mut a, Btn::Up);
-    assert_eq!(a.quick_value(QuickRow::BlueLight), Some(slot_ui::QuickValue::Off));
+    assert_eq!(
+        a.quick_value(QuickRow::BlueLight),
+        Some(slot_ui::QuickValue::Off)
+    );
     press(&mut a, Btn::Down);
     soft.shot(&mut a, "20_blue_light");
-    assert_eq!(a.quick_value(QuickRow::BlueLight), Some(slot_ui::QuickValue::level(1)));
+    assert_eq!(
+        a.quick_value(QuickRow::BlueLight),
+        Some(slot_ui::QuickValue::level(1))
+    );
 }
 
 #[test]
@@ -654,7 +697,9 @@ fn start_up_and_switch_off() {
     let start = a.now() + 10;
     a.tick_ms(start);
     assert_eq!(a.take_xmb_sound(), Some(slot::audio::XmbSound::Opening));
-    for ms in [30, 930, 1430, 1930, 2380, 2430, 2480, 2530, 2580, 2630, 2730, 2830, 2930, 3080, 3430, 3930] {
+    for ms in [
+        30, 930, 1430, 1930, 2380, 2430, 2480, 2530, 2580, 2630, 2730, 2830, 2930, 3080, 3430, 3930,
+    ] {
         a.tick_ms(start + ms);
         soft.shot_bare(&mut a, &format!("30_intro_{ms:04}"));
     }
@@ -666,7 +711,9 @@ fn start_up_and_switch_off() {
     });
     let begun = c.now() + 10;
     c.tick_ms(begun);
-    for ms in [2430, 2530, 2580, 2630, 2680, 2730, 2780, 2830, 2880, 2980, 3080, 3280] {
+    for ms in [
+        2430, 2530, 2580, 2630, 2680, 2730, 2780, 2830, 2880, 2980, 3080, 3280,
+    ] {
         c.tick_ms(begun + ms);
         soft2.shot_bare(&mut c, &format!("31_classic_{ms:04}"));
     }
@@ -707,7 +754,11 @@ fn shoulders_jump_a_letter_and_the_place_survives_a_stop() {
     );
     assert!(a.quick_menu().is_none(), "R1 stays on the games");
     a.apply(Action::PreviousShelf);
-    assert_eq!(a.selected_stem().map(str::to_string), first, "L1 goes back a letter");
+    assert_eq!(
+        a.selected_stem().map(str::to_string),
+        first,
+        "L1 goes back a letter"
+    );
     // Hover a game, go into Settings, and be stopped from outside: the game is remembered.
     for _ in 0..3 {
         press(&mut a, Btn::Down);
@@ -717,7 +768,11 @@ fn shoulders_jump_a_letter_and_the_place_survives_a_stop() {
     assert!(a.quick_menu().is_some());
     soft.settle(&mut a, 2);
     let st = slot_store::read_slot_state(d.path());
-    assert_eq!(st.shelf_cart.map(|c| c.stem), want, "remembered on the way into Settings");
+    assert_eq!(
+        st.shelf_cart.map(|c| c.stem),
+        want,
+        "remembered on the way into Settings"
+    );
     let (b, _c) = app_booting_at(d.path(), CLOCK_IS_SET);
     assert_eq!(b.selected_stem().map(str::to_string), want);
 }
@@ -727,7 +782,11 @@ fn a_game_fades_up_from_black_without_the_television_effect() {
     let d = root(SlotState::default());
     write_slot_state(
         d.path(),
-        &SlotState { cart: Some("Golden Sun".into()), clock_set: true, ..SlotState::default() },
+        &SlotState {
+            cart: Some("Golden Sun".into()),
+            clock_set: true,
+            ..SlotState::default()
+        },
     )
     .unwrap();
     let mut a = App::boot(d.path());
@@ -745,20 +804,31 @@ fn a_game_fades_up_from_black_without_the_television_effect() {
     assert_eq!(a.screen_power(), 1.0);
     let mut out = Vec::new();
     a.draw(&mut out);
-    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game is drawn");
+    let game = out
+        .iter()
+        .position(|d| matches!(d, Draw::Game))
+        .expect("the game is drawn");
     let fade = out[game..].iter().find_map(|d| match d {
         Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0] => Some(colour[3]),
         _ => None,
     });
-    assert!(fade.is_some_and(|a| a > 0.0 && a < 1.0), "black fading off over the game: {fade:?}");
+    assert!(
+        fade.is_some_and(|a| a > 0.0 && a < 1.0),
+        "black fading off over the game: {fade:?}"
+    );
     for _ in 0..30 {
         a.update(1.0 / 30.0);
     }
     let mut out = Vec::new();
     a.draw(&mut out);
-    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game is drawn");
+    let game = out
+        .iter()
+        .position(|d| matches!(d, Draw::Game))
+        .expect("the game is drawn");
     assert!(
-        !out[game..].iter().any(|d| matches!(d, Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0])),
+        !out[game..]
+            .iter()
+            .any(|d| matches!(d, Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0])),
         "faded up after a second"
     );
 }
@@ -777,12 +847,18 @@ fn leaving_a_game_fades_it_down_into_black() {
     assert_eq!(a.screen_power(), 1.0, "no switch-off effect");
     let mut out = Vec::new();
     a.draw(&mut out);
-    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game still shows");
+    let game = out
+        .iter()
+        .position(|d| matches!(d, Draw::Game))
+        .expect("the game still shows");
     let fade = out[game..].iter().find_map(|d| match d {
         Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0] => Some(colour[3]),
         _ => None,
     });
-    assert!(fade.is_some_and(|a| a > 0.0 && a < 1.0), "black fading over the game: {fade:?}");
+    assert!(
+        fade.is_some_and(|a| a > 0.0 && a < 1.0),
+        "black fading over the game: {fade:?}"
+    );
 }
 
 #[test]
@@ -791,7 +867,12 @@ fn the_paused_game_menu_is_always_dark() {
         let d = root(SlotState::default());
         write_slot_state(
             d.path(),
-            &SlotState { cart: Some("Golden Sun".into()), clock_set: true, xmb_colour: colour, ..SlotState::default() },
+            &SlotState {
+                cart: Some("Golden Sun".into()),
+                clock_set: true,
+                xmb_colour: colour,
+                ..SlotState::default()
+            },
         )
         .unwrap();
         let mut a = App::boot(d.path());
@@ -811,7 +892,11 @@ fn the_paused_game_menu_is_always_dark() {
                 _ => None,
             })
             .expect("a backdrop behind the menu");
-        assert_eq!(b.colours, slot_ui::xmb_pause_colours(), "colour {colour} goes dark");
+        assert_eq!(
+            b.colours,
+            slot_ui::xmb_pause_colours(),
+            "colour {colour} goes dark"
+        );
         assert!(b.ground.is_none());
     }
 }
@@ -821,7 +906,13 @@ fn the_dark_pause_menu_can_be_turned_off() {
     let d = root(SlotState::default());
     write_slot_state(
         d.path(),
-        &SlotState { cart: Some("Golden Sun".into()), clock_set: true, xmb_colour: 20, xmb_pause_dark: false, ..SlotState::default() },
+        &SlotState {
+            cart: Some("Golden Sun".into()),
+            clock_set: true,
+            xmb_colour: 20,
+            xmb_pause_dark: false,
+            ..SlotState::default()
+        },
     )
     .unwrap();
     let mut a = App::boot(d.path());
@@ -841,6 +932,10 @@ fn the_dark_pause_menu_can_be_turned_off() {
             _ => None,
         })
         .expect("a backdrop behind the menu");
-    assert_eq!(b.colours, slot_ui::xmb_backdrop_colours(20), "off: the bar's own colour");
+    assert_eq!(
+        b.colours,
+        slot_ui::xmb_backdrop_colours(20),
+        "off: the bar's own colour"
+    );
     assert!(SlotState::default().xmb_pause_dark, "on by default");
 }

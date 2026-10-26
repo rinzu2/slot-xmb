@@ -6,7 +6,9 @@
 //! upper pair that cross each other a third of the way down, and a lower pair that run close
 //! together near the bottom.
 
-use slot_gfx::{backdrop_put, BACKDROP_COLS, BACKDROP_LINES, BACKDROP_ROWS, ROW_EDGES, ROW_LINES, STYLE_CLASSIC};
+use slot_gfx::{
+    backdrop_put, BACKDROP_COLS, BACKDROP_LINES, BACKDROP_ROWS, ROW_EDGES, ROW_LINES, STYLE_CLASSIC,
+};
 
 const TAU: f32 = std::f32::consts::TAU;
 
@@ -154,7 +156,10 @@ mod tests {
             crossed |= (at(0.0)[0] > at(0.0)[1]) != (at(1.0)[0] > at(1.0)[1]);
             for c in 0..64 {
                 let l = at(c as f32 / 63.0);
-                assert!(l[0] < 0.5 && l[1] < 0.5 && l[2] > 0.7 && l[3] > 0.7, "{l:?}");
+                assert!(
+                    l[0] < 0.5 && l[1] < 0.5 && l[2] > 0.7 && l[3] > 0.7,
+                    "{l:?}"
+                );
             }
         }
         assert!(crossed);

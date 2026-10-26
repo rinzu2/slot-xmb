@@ -169,11 +169,12 @@ pub fn run() {
         None => boot(None),
     };
     slot::boot_time::mark("frontend");
-    let step = |intro: &mut Option<BootIntro>, compositor: &mut Compositor, surface: &mut FbdevSurface| {
-        if let Some(intro) = intro {
-            intro.frame(compositor, surface, true);
-        }
-    };
+    let step =
+        |intro: &mut Option<BootIntro>, compositor: &mut Compositor, surface: &mut FbdevSurface| {
+            if let Some(intro) = intro {
+                intro.frame(compositor, surface, true);
+            }
+        };
     let target = slot::baseos::var("BASEOS_TARGET").unwrap_or_default();
     frontend.set_left_stick(slot::input::evdev::has_left_stick(&target));
     if let Some(intro) = &intro {
@@ -317,7 +318,11 @@ struct BootIntro {
 }
 
 impl BootIntro {
-    fn begin(root: &std::path::Path, compositor: &mut Compositor, window: (u32, u32)) -> Option<Self> {
+    fn begin(
+        root: &std::path::Path,
+        compositor: &mut Compositor,
+        window: (u32, u32),
+    ) -> Option<Self> {
         if !slot::app::XMB {
             return None;
         }
@@ -339,7 +344,10 @@ impl BootIntro {
         let style = state.xmb_wave.min(1);
         let mut buf = Vec::new();
         slot_ui::xmb_curves_at(style, 0.0, Some(0.0), &mut buf);
-        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+        let (w, h) = (
+            slot_gfx::BACKDROP_COLS as u32,
+            slot_gfx::BACKDROP_ROWS as u32,
+        );
         let curves = compositor.create_texture_nearest(w, h, &buf);
         let f = slot_ui::xmb_flare_face(slot_ui::xmb_pale(slot_ui::xmb_swatch(colour)));
         let flare = compositor.create_texture(f.w, f.h, &f.rgba);
@@ -350,7 +358,8 @@ impl BootIntro {
         let f = slot_ui::xmb_ring_face();
         let ring = compositor.create_texture(f.w, f.h, &f.rgba);
         let grounds = slot::xmb_ground::load(root);
-        let ground = slot::xmb_ground::face(&grounds, colour).map(|f| compositor.create_texture(f.w, f.h, &f.rgba));
+        let ground = slot::xmb_ground::face(&grounds, colour)
+            .map(|f| compositor.create_texture(f.w, f.h, &f.rgba));
         let (f, at) = slot_ui::xmb_title_face(slot_gfx::Canvas::of(window));
         let title = (compositor.create_texture(f.w, f.h, &f.rgba), at);
         Some(BootIntro {
@@ -375,7 +384,12 @@ impl BootIntro {
 
     /// The opening chime, in step with the animation: once the sound device is open, the part
     /// of the chime already due is skipped.
-    fn chime(root: &std::path::Path, sink: &dyn slot::audio::AudioSink, started: Instant, volume: u8) {
+    fn chime(
+        root: &std::path::Path,
+        sink: &dyn slot::audio::AudioSink,
+        started: Instant,
+        volume: u8,
+    ) {
         let ring = sink.ring();
         let rate = ring.sample_rate();
         if rate == 0 {
@@ -406,8 +420,16 @@ impl BootIntro {
         }
         self.last = Some(Instant::now());
         let t = self.clock;
-        slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
-        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+        slot_ui::xmb_curves_at(
+            self.style,
+            t,
+            Some(t - slot_ui::XMB_INTRO_WAVES),
+            &mut self.buf,
+        );
+        let (w, h) = (
+            slot_gfx::BACKDROP_COLS as u32,
+            slot_gfx::BACKDROP_ROWS as u32,
+        );
         compositor.update_texture(self.curves, w, h, &self.buf);
         let canvas = slot_gfx::Canvas::of(self.window);
         self.draws.clear();

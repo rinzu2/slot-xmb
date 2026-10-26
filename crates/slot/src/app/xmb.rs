@@ -7,8 +7,7 @@ use super::*;
 use slot_power::Charge;
 use slot_ui::Field;
 use slot_ui::{
-    Xmb, XmbCat, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,
-    XmbText,
+    Xmb, XmbCat, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes, XmbText,
 };
 
 /// A value strip open on a setting.
@@ -116,7 +115,10 @@ impl App {
         let Phase::SetClock { picker, .. } = &mut self.phase else {
             return;
         };
-        let at = order.iter().position(|f| *f == picker.cursor()).unwrap_or(0) as i32;
+        let at = order
+            .iter()
+            .position(|f| *f == picker.cursor())
+            .unwrap_or(0) as i32;
         let to = (at + by).clamp(0, order.len() as i32 - 1) as usize;
         picker.field(order[to]);
     }
@@ -150,12 +152,24 @@ impl App {
         };
         push(format!("{shown:02}"), Some(Field::Hour), &mut parts);
         push(":".to_string(), None, &mut parts);
-        push(format!("{:02}", picker.minute()), Some(Field::Minute), &mut parts);
+        push(
+            format!("{:02}", picker.minute()),
+            Some(Field::Minute),
+            &mut parts,
+        );
         push(":".to_string(), None, &mut parts);
-        push(format!("{:02}", self.wall_secs().rem_euclid(60)), None, &mut parts);
+        push(
+            format!("{:02}", self.wall_secs().rem_euclid(60)),
+            None,
+            &mut parts,
+        );
         if !self.state.xmb_clock24 {
             parts.push(None);
-            push(if h < 12 { "AM" } else { "PM" }.to_string(), None, &mut parts);
+            push(
+                if h < 12 { "AM" } else { "PM" }.to_string(),
+                None,
+                &mut parts,
+            );
         }
         (parts, at)
     }
@@ -237,7 +251,11 @@ impl App {
     }
 
     fn xmb_clock_now(&self) -> String {
-        slot_ui::xmb_clock_text(self.wall_secs(), self.state.xmb_date_format, self.state.xmb_clock24)
+        slot_ui::xmb_clock_text(
+            self.wall_secs(),
+            self.state.xmb_date_format,
+            self.state.xmb_clock24,
+        )
     }
 
     /// Seconds for the waves and the glow, wrapped every ten hours to keep f32 precise.
@@ -290,7 +308,10 @@ impl App {
         if row.binds() {
             return Some(match self.capture_row() == Some(row) {
                 true => RECORDING.to_string(),
-                false => self.bound_text(row).trim_start_matches(CLASH_MARK).to_string(),
+                false => self
+                    .bound_text(row)
+                    .trim_start_matches(CLASH_MARK)
+                    .to_string(),
             });
         }
         let bezel = |p: Platform| Some(self.resolved_bezel(p).label());
@@ -310,7 +331,8 @@ impl App {
                 self.state.xmb_clock24,
             )),
             QuickRow::XmbDateFormat => Some(
-                slot_ui::XMB_DATE_FORMATS[usize::from(self.state.xmb_date_format.min(2))].to_string(),
+                slot_ui::XMB_DATE_FORMATS[usize::from(self.state.xmb_date_format.min(2))]
+                    .to_string(),
             ),
             QuickRow::XmbTimeFormat => {
                 Some(slot_ui::XMB_TIME_FORMATS[usize::from(self.state.xmb_clock24)].to_string())
@@ -351,7 +373,10 @@ impl App {
     fn xmb_choices(&self, row: QuickRow) -> (Vec<Choice>, usize) {
         let texts = |items: &[&str], at: usize| {
             (
-                items.iter().map(|s| Choice::Text(s.to_string())).collect::<Vec<_>>(),
+                items
+                    .iter()
+                    .map(|s| Choice::Text(s.to_string()))
+                    .collect::<Vec<_>>(),
                 at.min(items.len().saturating_sub(1)),
             )
         };
@@ -363,15 +388,23 @@ impl App {
                 return (c, at);
             }
             QuickRow::XmbWave => {
-                return texts(&["Original", "Classic", "Wallpaper"], self.state.xmb_wave.into())
+                return texts(
+                    &["Original", "Classic", "Wallpaper"],
+                    self.state.xmb_wave.into(),
+                )
             }
             QuickRow::XmbDateFormat => {
-                return texts(&slot_ui::XMB_DATE_FORMATS, self.state.xmb_date_format.into())
+                return texts(
+                    &slot_ui::XMB_DATE_FORMATS,
+                    self.state.xmb_date_format.into(),
+                )
             }
             QuickRow::XmbTimeFormat => {
                 return texts(&slot_ui::XMB_TIME_FORMATS, self.state.xmb_clock24.into())
             }
-            QuickRow::XmbBattery => return texts(&["Off", "On"], self.state.xmb_battery_pct.into()),
+            QuickRow::XmbBattery => {
+                return texts(&["Off", "On"], self.state.xmb_battery_pct.into())
+            }
             QuickRow::XmbPause => return texts(&["Off", "On"], self.state.xmb_pause_dark.into()),
             QuickRow::XmbTimeZone => {
                 let (lo, hi) = (slot_store::UTC_OFFSET_MIN, slot_store::UTC_OFFSET_MAX);
@@ -388,14 +421,16 @@ impl App {
                 let names: Vec<&str> = names.iter().map(String::as_str).collect();
                 return texts(&names, at);
             }
-            QuickRow::XmbIcons => return texts(&["Cartridge", "Label"], self.state.xmb_labels.into()),
+            QuickRow::XmbIcons => {
+                return texts(&["Cartridge", "Label"], self.state.xmb_labels.into())
+            }
             _ => {}
         }
         let current = self.xmb_value_text(row).unwrap_or_default();
         // Shaders list the ones the row's console offers, Off first.
         let shaders = match self.playing_row(row) {
-            QuickRow::GbaShader => Some(&slot_store::Shader::GBA),
-            QuickRow::GbShader | QuickRow::GbcShader => Some(&slot_store::Shader::GB),
+            QuickRow::GbaShader => Some(&slot_store::Shader::GBA[..]),
+            QuickRow::GbShader | QuickRow::GbcShader => Some(&slot_store::Shader::GB[..]),
             _ => None,
         };
         if let Some(list) = shaders {
@@ -526,7 +561,11 @@ impl App {
         in_game: bool,
         t: &Texts,
     ) -> (Vec<XmbRow>, ListPart, StripPart) {
-        let column: Vec<QuickRow> = top.iter().copied().filter(|r| !hidden.contains(r)).collect();
+        let column: Vec<QuickRow> = top
+            .iter()
+            .copied()
+            .filter(|r| !hidden.contains(r))
+            .collect();
         let head = Self::xmb_top_of(row, top, in_game);
         let at = column.iter().position(|r| *r == head).unwrap_or(0);
         let rows = self.xmb_icon_rows(&column, at, t);
@@ -682,7 +721,8 @@ impl App {
         match &self.phase {
             Phase::QuickMenu { row } => {
                 let hidden = self.hidden_rows();
-                let (rows, list, picker) = self.xmb_menu_parts(*row, &QuickRow::MAIN, &hidden, false, t);
+                let (rows, list, picker) =
+                    self.xmb_menu_parts(*row, &QuickRow::MAIN, &hidden, false, t);
                 scene.rows = rows;
                 scene.list = list;
                 scene.picker = picker;
@@ -702,7 +742,10 @@ impl App {
                     .copied()
                     .filter(|r| !hidden.contains(r))
                     .collect();
-                let at = column.iter().position(|r| *r == QuickRow::About).unwrap_or(0);
+                let at = column
+                    .iter()
+                    .position(|r| *r == QuickRow::About)
+                    .unwrap_or(0);
                 scene.rows = self.xmb_icon_rows(&column, at, t);
                 let items = self.xmb_about_items(t);
                 let at = self.xmb_about.min(items.len().saturating_sub(1));
@@ -711,7 +754,9 @@ impl App {
             _ => {
                 scene.rows = self.xmb_game_rows(t);
                 scene.sizes = XmbSizes::GAMES;
-                scene.options = self.xmb_options.map(|o| (self.xmb_option_entries(o, t), o.at));
+                scene.options = self
+                    .xmb_options
+                    .map(|o| (self.xmb_option_entries(o, t), o.at));
             }
         }
         scene
@@ -755,7 +800,14 @@ impl App {
         })
     }
 
-    fn xmb_draw_scene(&self, scene: &Scene, backdrop: Option<slot_gfx::Backdrop>, col: f32, alpha: f32, out: &mut Vec<Draw>) {
+    fn xmb_draw_scene(
+        &self,
+        scene: &Scene,
+        backdrop: Option<slot_gfx::Backdrop>,
+        col: f32,
+        alpha: f32,
+        out: &mut Vec<Draw>,
+    ) {
         self.xmb_draw_scene_with(scene, backdrop, col, alpha, alpha, out);
     }
 
@@ -783,7 +835,10 @@ impl App {
             rows: &scene.rows,
             sizes: scene.sizes,
             nest: self.xmb_nest,
-            list: scene.list.as_ref().map(|(items, at)| XmbList { items, at: *at }),
+            list: scene
+                .list
+                .as_ref()
+                .map(|(items, at)| XmbList { items, at: *at }),
             picker: scene.picker.as_ref().map(|(entries, at, first)| XmbPicker {
                 entries,
                 at: *at,
@@ -823,7 +878,11 @@ impl App {
         }
         let t = self.xmb_textures();
         let scene = self.xmb_scene(&t);
-        let backdrop = if wallpapered { None } else { self.xmb_backdrop(1.0) };
+        let backdrop = if wallpapered {
+            None
+        } else {
+            self.xmb_backdrop(1.0)
+        };
         self.xmb_draw_scene(&scene, backdrop, self.xmb_col, alpha, out);
     }
 
@@ -954,7 +1013,11 @@ impl App {
         let top = QuickRow::MAIN.contains(&row);
         let hidden = self.hidden_rows();
         match action {
-            Action::GbaDown(Btn::Up) => self.phase = Phase::QuickMenu { row: row.up(&hidden) },
+            Action::GbaDown(Btn::Up) => {
+                self.phase = Phase::QuickMenu {
+                    row: row.up(&hidden),
+                }
+            }
             Action::GbaDown(Btn::Down) => {
                 self.phase = Phase::QuickMenu {
                     row: row.down(&hidden),
@@ -1136,16 +1199,19 @@ impl App {
         if self.xmb_intro_done {
             return None;
         }
-        self.xmb_intro.map(|at| ((self.now() as f64 - at) / 1000.0) as f32)
+        self.xmb_intro
+            .map(|at| ((self.now() as f64 - at) / 1000.0) as f32)
     }
 
     /// Whether the bar is still hidden by the start-up animation, so nothing need wait for it.
     pub fn xmb_holds_faces(&self) -> bool {
-        self.xmb_intro_secs().is_some_and(|s| s < slot_ui::XMB_INTRO_BAR - 0.3)
+        self.xmb_intro_secs()
+            .is_some_and(|s| s < slot_ui::XMB_INTRO_BAR - 0.3)
     }
 
     pub(super) fn xmb_intro_active(&self) -> bool {
-        self.xmb_intro_secs().is_some_and(|s| s < slot_ui::XMB_INTRO_END)
+        self.xmb_intro_secs()
+            .is_some_and(|s| s < slot_ui::XMB_INTRO_END)
     }
 
     /// Seconds since the waves' fast start-up run began; it stays given once there was a
@@ -1265,7 +1331,13 @@ impl App {
         let dark = ease(ramp(p, 0.72, 0.28));
         if dark > 0.0 {
             let c = self.canvas();
-            out.push(Draw::Rect { x: 0.0, y: 0.0, w: c.w, h: c.h, colour: [0.0, 0.0, 0.0, dark] });
+            out.push(Draw::Rect {
+                x: 0.0,
+                y: 0.0,
+                w: c.w,
+                h: c.h,
+                colour: [0.0, 0.0, 0.0, dark],
+            });
         }
     }
 }

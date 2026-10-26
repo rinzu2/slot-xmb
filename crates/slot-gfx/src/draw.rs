@@ -123,7 +123,11 @@ impl Sprites {
         unsafe {
             gl::BindTexture(gl::TEXTURE_2D, tex);
             gl::GenerateMipmap(gl::TEXTURE_2D);
-            gl::TexParameteri(gl::TEXTURE_2D, gl::TEXTURE_MIN_FILTER, gl::LINEAR_MIPMAP_LINEAR as i32);
+            gl::TexParameteri(
+                gl::TEXTURE_2D,
+                gl::TEXTURE_MIN_FILTER,
+                gl::LINEAR_MIPMAP_LINEAR as i32,
+            );
         }
         self.textures.push(tex);
         TexId(self.textures.len() - 1)

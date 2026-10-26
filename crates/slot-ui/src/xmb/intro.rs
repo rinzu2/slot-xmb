@@ -201,7 +201,10 @@ pub fn xmb_title_face(canvas: Canvas) -> (CartFace, [f32; 4]) {
     let bottom = glyphs.iter().map(|g| g.1 + g.3 as i32).max().unwrap_or(0);
     // Room for the faint bloom about the letters.
     let pad = 2;
-    let (w, h) = ((right - left + 2 * pad) as u32, (bottom - top + 2 * pad) as u32);
+    let (w, h) = (
+        (right - left + 2 * pad) as u32,
+        (bottom - top + 2 * pad) as u32,
+    );
     let mut alpha = vec![0u8; (w * h) as usize];
     for (gx, gy, gw, gh, cov) in &glyphs {
         for y in 0..*gh {
@@ -373,7 +376,11 @@ impl XmbIntro {
         if lens > 0.0 {
             if let Some(tex) = self.flare {
                 let swell = ease(ramp(t, XMB_INTRO_BLOOM - 0.04, 0.12));
-                let lh = lerp(lerp(26.0, 70.0, ease(ramp(t, 1.3, 1.15))) * k, h * 1.7, swell);
+                let lh = lerp(
+                    lerp(26.0, 70.0, ease(ramp(t, 1.3, 1.15))) * k,
+                    h * 1.7,
+                    swell,
+                );
                 let lw = w * lerp(1.3, 2.0, swell);
                 out.push(Draw::Tex {
                     x: (w - lw) / 2.0,
@@ -451,7 +458,10 @@ mod tests {
         assert!(px[(line * w) as usize][0] > 10);
         assert!(px[(line * w + w - 1) as usize][0] > 10);
         // The lettering is bright, centred and sits between the lines.
-        let canvas = Canvas { w: w as f32, h: h as f32 };
+        let canvas = Canvas {
+            w: w as f32,
+            h: h as f32,
+        };
         let (_, [x, y, tw, th]) = xmb_title_face(canvas);
         assert!(((x + tw / 2.0) - w as f32 / 2.0).abs() <= 1.0);
         assert!(y > 220.0 && y + th < 256.0);

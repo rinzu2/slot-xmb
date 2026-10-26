@@ -226,6 +226,8 @@ fn the_values_read_as_the_menu_prints_them() {
             "Grid",
             "Dot",
             "Simpletex",
+            "Sharp Bilinear",
+            "LCD Grid v2",
             "Dark",
             "Light",
             "Show",

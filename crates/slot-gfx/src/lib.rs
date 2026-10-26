@@ -25,10 +25,10 @@ mod shaders;
 mod surface;
 
 pub use backdrop::{
-    decode as backdrop_decode, encode as backdrop_encode, fragment_source as backdrop_fragment_source,
-    put as backdrop_put, shade as backdrop_shade, Backdrop, BackdropColours, BackdropEdges, BACKDROP_COLS, BACKDROP_PLAIN,
-    BACKDROP_ROWS, LINES as BACKDROP_LINES, ROW_EDGES, ROW_LINES, STYLE_CLASSIC,
-    STYLE_ORIGINAL,
+    decode as backdrop_decode, encode as backdrop_encode,
+    fragment_source as backdrop_fragment_source, put as backdrop_put, shade as backdrop_shade,
+    Backdrop, BackdropColours, BackdropEdges, BACKDROP_COLS, BACKDROP_PLAIN, BACKDROP_ROWS,
+    LINES as BACKDROP_LINES, ROW_EDGES, ROW_LINES, STYLE_CLASSIC, STYLE_ORIGINAL,
 };
 pub use bezel::{framed, game_rect, lifted_rect, screen_rect};
 pub use draw::{Draw, TexId};

@@ -16,6 +16,8 @@ pub enum ScreenEffect {
     Grid,
     Dot,
     Simpletex,
+    SharpBilinear,
+    LcdGridV2,
 }
 
 impl ScreenEffect {
