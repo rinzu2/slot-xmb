@@ -69,11 +69,11 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 
 **Settings**
 
-- Theme Settings: Background, Color (or Wallpaper), and Game Icons.
+- Theme Settings: Background, Color (or Wallpaper), Game Icons, and Dark Pause Menu.
 - Date & Time Settings: a PSP-style clock editor, date format, 12- or 24-hour time, and time zone.
 - Volume, brightness and screen-temperature gauges in the PSP's style.
 - About sits at the bottom of Settings and scrolls.
-- While a game is paused, the in-game menu goes dark whatever the colour, in either wave style, with the game showing only faintly behind it, inspired by the PS3.
+- While a game is paused, the in-game menu goes dark whatever the colour, in either wave style, with the game showing only faintly behind it, inspired by the PS3. Turn off **Dark Pause Menu** in Theme Settings to keep your colour there instead.
 
 **Power use**
 

@@ -1253,7 +1253,8 @@ impl App {
             | QuickRow::XmbDateFormat
             | QuickRow::XmbTimeFormat
             | QuickRow::XmbTimeZone
-            | QuickRow::XmbBattery => None,
+            | QuickRow::XmbBattery
+            | QuickRow::XmbPause => None,
             QuickRow::DateTime
             | QuickRow::About
             | QuickRow::Screen
@@ -3002,6 +3003,7 @@ impl App {
             | QuickRow::XmbTimeFormat
             | QuickRow::XmbTimeZone
             | QuickRow::XmbBattery
+            | QuickRow::XmbPause
             | QuickRow::LidOff => {}
         }
     }
@@ -3030,6 +3032,10 @@ impl App {
             }
             QuickRow::XmbBattery => {
                 self.state.xmb_battery_pct = !self.state.xmb_battery_pct;
+                return self.persist();
+            }
+            QuickRow::XmbPause => {
+                self.state.xmb_pause_dark = !self.state.xmb_pause_dark;
                 return self.persist();
             }
             QuickRow::XmbTimeZone => {
@@ -3257,6 +3263,7 @@ impl App {
             | QuickRow::XmbTimeFormat
             | QuickRow::XmbTimeZone
             | QuickRow::XmbBattery
+            | QuickRow::XmbPause
             | QuickRow::LidOff => return,
         }
         self.persist();

@@ -106,10 +106,11 @@ pub enum QuickRow {
     XmbTimeFormat,
     XmbTimeZone,
     XmbBattery,
+    XmbPause,
 }
 
 impl QuickRow {
-    pub const ALL: [QuickRow; 95] = [
+    pub const ALL: [QuickRow; 96] = [
         QuickRow::FastForward,
         QuickRow::FastForwardSound,
         QuickRow::Screen,
@@ -205,6 +206,7 @@ impl QuickRow {
         QuickRow::XmbTimeFormat,
         QuickRow::XmbTimeZone,
         QuickRow::XmbBattery,
+        QuickRow::XmbPause,
     ];
 
     /// The bar's own pages sit among these but are hidden with the carousel, where About keeps
@@ -230,11 +232,12 @@ impl QuickRow {
         QuickRow::DateTime,
     ];
 
-    pub const XMB_THEME: [QuickRow; 4] = [
+    pub const XMB_THEME: [QuickRow; 5] = [
         QuickRow::XmbWave,
         QuickRow::XmbColour,
         QuickRow::XmbWallpaper,
         QuickRow::XmbIcons,
+        QuickRow::XmbPause,
     ];
 
     pub const XMB_CLOCK: [QuickRow; 4] = [
@@ -396,7 +399,8 @@ impl QuickRow {
             QuickRow::XmbWave
             | QuickRow::XmbColour
             | QuickRow::XmbIcons
-            | QuickRow::XmbWallpaper => &QuickRow::XMB_THEME,
+            | QuickRow::XmbWallpaper
+            | QuickRow::XmbPause => &QuickRow::XMB_THEME,
             QuickRow::XmbSetClock
             | QuickRow::XmbDateFormat
             | QuickRow::XmbTimeFormat
@@ -594,6 +598,7 @@ impl QuickRow {
             QuickRow::XmbTimeFormat => "Time Format",
             QuickRow::XmbTimeZone => "Time Zone",
             QuickRow::XmbBattery => "Battery Percentage",
+            QuickRow::XmbPause => "Dark Pause Menu",
         }
     }
 

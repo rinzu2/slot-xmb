@@ -317,6 +317,7 @@ impl App {
             }
             QuickRow::XmbTimeZone => Some(zone_text(self.state.utc_offset_min)),
             QuickRow::XmbBattery => Some(on_off(self.state.xmb_battery_pct)),
+            QuickRow::XmbPause => Some(on_off(self.state.xmb_pause_dark)),
             // The handheld shows no value beside its colour; the strip shows the swatches.
             QuickRow::XmbColour => None,
             QuickRow::XmbIcons => Some(
@@ -371,6 +372,7 @@ impl App {
                 return texts(&slot_ui::XMB_TIME_FORMATS, self.state.xmb_clock24.into())
             }
             QuickRow::XmbBattery => return texts(&["Off", "On"], self.state.xmb_battery_pct.into()),
+            QuickRow::XmbPause => return texts(&["Off", "On"], self.state.xmb_pause_dark.into()),
             QuickRow::XmbTimeZone => {
                 let (lo, hi) = (slot_store::UTC_OFFSET_MIN, slot_store::UTC_OFFSET_MAX);
                 let names: Vec<String> = (lo..=hi).step_by(30).map(zone_text).collect();
@@ -831,11 +833,15 @@ impl App {
         let scene = self.xmb_in_game_scene(row, &t);
         // The game shows only faintly through the bar, which goes dark while a game is paused
         // whatever its colour, as the PS3's does.
-        let backdrop = self.xmb_backdrop(0.96).map(|b| slot_gfx::Backdrop {
-            colours: slot_ui::xmb_pause_colours(),
-            edges: slot_ui::xmb_pause_edges(),
-            ground: None,
-            ..b
+        let dark = self.state.xmb_pause_dark;
+        let backdrop = self.xmb_backdrop(0.96).map(|b| match dark {
+            true => slot_gfx::Backdrop {
+                colours: slot_ui::xmb_pause_colours(),
+                edges: slot_ui::xmb_pause_edges(),
+                ground: None,
+                ..b
+            },
+            false => b,
         });
         self.xmb_draw_scene(&scene, backdrop, 0.0, 1.0, out);
     }

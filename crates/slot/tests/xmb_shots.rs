@@ -815,3 +815,32 @@ fn the_paused_game_menu_is_always_dark() {
         assert!(b.ground.is_none());
     }
 }
+
+#[test]
+fn the_dark_pause_menu_can_be_turned_off() {
+    let d = root(SlotState::default());
+    write_slot_state(
+        d.path(),
+        &SlotState { cart: Some("Golden Sun".into()), clock_set: true, xmb_colour: 20, xmb_pause_dark: false, ..SlotState::default() },
+    )
+    .unwrap();
+    let mut a = App::boot(d.path());
+    a.set_panel((640, 480));
+    a.set_snapshot(common::StubSnapshot::boxed());
+    a.on_core_ready();
+    a.set_game_ready(true);
+    let mut soft = Soft::new();
+    soft.faces(&mut a);
+    soft.settle(&mut a, 60);
+    a.apply(Action::QuickMenu);
+    let out = soft.shot(&mut a, "pause_colour_check");
+    let b = out
+        .iter()
+        .find_map(|d| match d {
+            Draw::Backdrop(b) => Some(*b),
+            _ => None,
+        })
+        .expect("a backdrop behind the menu");
+    assert_eq!(b.colours, slot_ui::xmb_backdrop_colours(20), "off: the bar's own colour");
+    assert!(SlotState::default().xmb_pause_dark, "on by default");
+}
