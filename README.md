@@ -37,7 +37,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 </p>
 <p align="center">
 <img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge, in Indigo with Classic waves">
-<img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu">
+<img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu, in Charcoal">
 </p>
 <p align="center">
 <img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings, in Gold with Classic waves">
