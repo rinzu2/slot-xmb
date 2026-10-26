@@ -37,7 +37,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 </p>
 <p align="center">
 <img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge, in Indigo with Classic waves">
-<img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu, in Rose">
+<img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu, dark while the game is paused">
 </p>
 <p align="center">
 <img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings, in Gold with Classic waves">
@@ -73,6 +73,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 - Date & Time Settings: a PSP-style clock editor, date format, 12- or 24-hour time, and time zone.
 - Volume, brightness and screen-temperature gauges in the PSP's style.
 - About sits at the bottom of Settings and scrolls.
+- While a game is paused, the in-game menu goes dark whatever the colour, in either wave style, with the game showing only faintly behind it, inspired by the PS3.
 
 **Power use**
 

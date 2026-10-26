@@ -385,6 +385,40 @@ pub fn xmb_backdrop_edges(colour: u32) -> BackdropEdges {
     XMB_EDGES[(colour.clamp(1, XMB_COLOUR_COUNT as u32) - 1) as usize]
 }
 
+/// The dark colour drawn behind the in-game menu, whatever colour the bar is set to, after the
+/// PS3's: a near-black field, its waves a dim grey, so the game paused behind stays the focus.
+/// Laid out as a palette entry (top, ground, sheet below its edge, sheet at the bottom,
+/// Classic's ground), left, middle and right.
+const XMB_PAUSE: [[[u8; 3]; 3]; 5] = [
+    [[22, 22, 26], [16, 16, 20], [28, 28, 34]],
+    [[8, 8, 10], [7, 7, 9], [10, 10, 12]],
+    [[54, 54, 60], [48, 48, 54], [60, 60, 68]],
+    [[24, 24, 28], [22, 22, 26], [28, 28, 32]],
+    [[9, 9, 11], [8, 8, 10], [11, 11, 13]],
+];
+
+/// The pause colour's edges: a faint light under the main wave, a faint veil behind it.
+const XMB_PAUSE_EDGES: BackdropEdges = [
+    [0.05, 0.05, 0.06, 24.0],
+    [0.0, 0.0, 0.0, 64.0],
+    [0.3, 0.0, 0.0, 0.0],
+];
+
+/// The colours of the dark backdrop behind the in-game menu.
+pub fn xmb_pause_colours() -> BackdropColours {
+    let mut out = [[0; 3]; 15];
+    for (part, three) in XMB_PAUSE.iter().enumerate() {
+        for (i, c) in three.iter().enumerate() {
+            out[part * 3 + i] = *c;
+        }
+    }
+    out
+}
+
+pub fn xmb_pause_edges() -> BackdropEdges {
+    XMB_PAUSE_EDGES
+}
+
 /// The square the colour picker shows for a colour: its top, across the middle and right.
 pub fn xmb_swatch(colour: u32) -> [u8; 3] {
     let e = entry(colour);

@@ -784,3 +784,34 @@ fn leaving_a_game_fades_it_down_into_black() {
     });
     assert!(fade.is_some_and(|a| a > 0.0 && a < 1.0), "black fading over the game: {fade:?}");
 }
+
+#[test]
+fn the_paused_game_menu_is_always_dark() {
+    for colour in [5u8, 20, 30] {
+        let d = root(SlotState::default());
+        write_slot_state(
+            d.path(),
+            &SlotState { cart: Some("Golden Sun".into()), clock_set: true, xmb_colour: colour, ..SlotState::default() },
+        )
+        .unwrap();
+        let mut a = App::boot(d.path());
+        a.set_panel((640, 480));
+        a.set_snapshot(common::StubSnapshot::boxed());
+        a.on_core_ready();
+        a.set_game_ready(true);
+        let mut soft = Soft::new();
+        soft.faces(&mut a);
+        soft.settle(&mut a, 60);
+        a.apply(Action::QuickMenu);
+        let out = soft.shot(&mut a, "pause_check");
+        let b = out
+            .iter()
+            .find_map(|d| match d {
+                Draw::Backdrop(b) => Some(*b),
+                _ => None,
+            })
+            .expect("a backdrop behind the menu");
+        assert_eq!(b.colours, slot_ui::xmb_pause_colours(), "colour {colour} goes dark");
+        assert!(b.ground.is_none());
+    }
+}

@@ -15,7 +15,7 @@ pub use art::{
     XMB_HALOS, XMB_ICONS,
 };
 pub use palette::{
-    month_of, xmb_backdrop_colours, xmb_backdrop_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS, xmb_swatch, XMB_COLOUR_COUNT, XMB_MONTHS,
+    month_of, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS, xmb_swatch, XMB_COLOUR_COUNT, XMB_MONTHS,
     XMB_PALETTE,
 };
 pub use text::{xmb_text_face, XmbSize};

@@ -107,7 +107,7 @@ pub use sticker::{
 };
 pub use toast::{toast_box, toast_face, toast_rect, Toast};
 pub use xmb::{
-    classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
+    classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
     xmb_curves,
     xmb_curves_at, xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face,
     XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
