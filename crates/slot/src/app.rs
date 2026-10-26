@@ -56,6 +56,10 @@ pub const EJECT_S: f32 = SEATED_AT;
 const EJECT_HOLD_S: f32 = 0.35;
 
 const POWER_ON_S: f32 = 0.22;
+/// With the bar, how long a game takes to fade up out of black.
+const XMB_FADE_UP_S: f32 = 0.4;
+/// With the bar, how long to wait for a game's first picture before fading up anyway.
+const XMB_FADE_WAIT_S: f32 = 1.5;
 
 const POWER_OFF_S: f32 = 0.16;
 
@@ -3580,14 +3584,18 @@ impl App {
     }
 
     fn step_screen(&mut self, dt: f32) {
-        self.blank_s = match self.blank_panel() {
-            Some(_) => self.blank_s + dt,
-            None => 0.0,
+        let waiting_xmb = XMB && !self.game_ready && matches!(self.phase, Phase::Playing { .. });
+        self.blank_s = match (self.blank_panel(), waiting_xmb) {
+            (Some(_), _) | (None, true) => self.blank_s + dt,
+            _ => 0.0,
         };
-        let lit = matches!(self.phase, Phase::Playing { .. } | Phase::Polaroids { .. })
-            || self.powering_up();
+        let lit = (matches!(self.phase, Phase::Playing { .. } | Phase::Polaroids { .. })
+            || self.powering_up())
+            // With the bar the game fades up from black once it has a picture to show (or, if
+            // none comes, after a moment, so the screen is never stuck black).
+            && (!XMB || self.game_ready || self.blank_s > XMB_FADE_WAIT_S);
         let step = if lit {
-            dt / POWER_ON_S
+            dt / if XMB { XMB_FADE_UP_S } else { POWER_ON_S }
         } else {
             -dt / POWER_OFF_S
         };
@@ -3760,6 +3768,10 @@ impl App {
     }
 
     pub fn blank_panel(&self) -> Option<[u8; 3]> {
+        // With the bar the screen stays black until the game's first picture.
+        if XMB {
+            return None;
+        }
         let waiting = self.powering_up()
             || (matches!(self.phase, Phase::Playing { .. }) && self.blank_s > 0.0);
         if self.game_ready || !waiting {
@@ -3778,8 +3790,14 @@ impl App {
         self.game_ready || self.blank_panel().is_some()
     }
 
+    /// How far the game's screen has switched on, for the old-television effect. With the bar a
+    /// game comes up out of black at full size instead (the fade is drawn over it), so the
+    /// effect is held at its end; switching a game off still plays it.
     pub fn screen_power(&self) -> f32 {
-        self.screen
+        match XMB && !matches!(self.phase, Phase::Ejecting { .. }) {
+            true => 1.0,
+            false => self.screen,
+        }
     }
 
     pub fn set_game_ready(&mut self, ready: bool) {
@@ -4272,9 +4290,12 @@ impl App {
                     self.xmb_black(self.seat(), out);
                 }
             }
+            // The game fades up out of the black the bar faded into.
             Phase::Playing { .. } if XMB && self.screen < 1.0 => {
                 self.xmb_black(1.0, out);
                 self.push_game(out);
+                let up = self.screen * self.screen * (3.0 - 2.0 * self.screen);
+                self.xmb_black(1.0 - up, out);
             }
             Phase::Inserting { .. } if self.powering_up() && self.framed_panel() => {
                 self.draw_powering(out)

@@ -721,3 +721,44 @@ fn shoulders_jump_a_letter_and_the_place_survives_a_stop() {
     let (b, _c) = app_booting_at(d.path(), CLOCK_IS_SET);
     assert_eq!(b.selected_stem().map(str::to_string), want);
 }
+
+#[test]
+fn a_game_fades_up_from_black_without_the_television_effect() {
+    let d = root(SlotState::default());
+    write_slot_state(
+        d.path(),
+        &SlotState { cart: Some("Golden Sun".into()), clock_set: true, ..SlotState::default() },
+    )
+    .unwrap();
+    let mut a = App::boot(d.path());
+    a.set_panel((640, 480));
+    a.set_snapshot(common::StubSnapshot::boxed());
+    a.on_core_ready();
+    for _ in 0..20 {
+        a.update(1.0 / 60.0);
+    }
+    // No picture yet: the screen stays black, with no lit panel.
+    assert!(a.blank_panel().is_none());
+    a.set_game_ready(true);
+    a.update(0.1);
+    // Full size all the way: the television effect is held at its end.
+    assert_eq!(a.screen_power(), 1.0);
+    let mut out = Vec::new();
+    a.draw(&mut out);
+    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game is drawn");
+    let fade = out[game..].iter().find_map(|d| match d {
+        Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0] => Some(colour[3]),
+        _ => None,
+    });
+    assert!(fade.is_some_and(|a| a > 0.0 && a < 1.0), "black fading off over the game: {fade:?}");
+    for _ in 0..30 {
+        a.update(1.0 / 30.0);
+    }
+    let mut out = Vec::new();
+    a.draw(&mut out);
+    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game is drawn");
+    assert!(
+        !out[game..].iter().any(|d| matches!(d, Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0])),
+        "faded up after a second"
+    );
+}
