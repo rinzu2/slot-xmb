@@ -24,23 +24,23 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 # What does it look like?
 
 <p align="center">
-<img src=".github/resources/xmb/01_home_gba.png" width="48%" alt="The Game Boy Advance column with game covers">
+<img src=".github/resources/xmb/01_home_gba.png" width="48%" alt="The Game Boy Advance column with game carts, in Violet">
 <img src=".github/resources/xmb/12_gb_labels.png" width="48%" alt="The Game Boy column on a pale pink colour">
 </p>
 <p align="center">
 <img src=".github/resources/xmb/07_classic_labels.png" width="48%" alt="Labels instead of cartridges, on a magenta colour">
-<img src=".github/resources/xmb/21_about.png" width="48%" alt="The About page">
+<img src=".github/resources/xmb/21_about.png" width="48%" alt="The About page, in Cyan">
 </p>
 <p align="center">
-<img src=".github/resources/xmb/03_settings.png" width="48%" alt="The Settings column">
-<img src=".github/resources/xmb/05_colour_picker.png" width="48%" alt="Picking a colour in Theme Settings">
+<img src=".github/resources/xmb/03_settings.png" width="48%" alt="The Settings column, in Green with Classic waves">
+<img src=".github/resources/xmb/05_colour_picker.png" width="48%" alt="Picking a colour in Theme Settings, previewing Orange">
 </p>
 <p align="center">
-<img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge">
+<img src=".github/resources/xmb/13_volume.png" width="48%" alt="The PSP-style volume gauge, in Crimson">
 <img src=".github/resources/xmb/14_in_game.png" width="48%" alt="The in-game menu">
 </p>
 <p align="center">
-<img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings">
+<img src=".github/resources/xmb/17_clock_settings.png" width="48%" alt="Date and Time Settings, in Gold with Classic waves">
 <img src=".github/resources/xmb/boot.png" width="48%" alt="The boot picture">
 </p>
 
@@ -79,10 +79,10 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 
 # Install
 
-Download `slot-xmb-v1.0-h700.zip` from this fork's [releases](../../releases). It's the complete slot v1.9.0 card layout, with the same cores, scripts and folders, plus the XMB build of `System/slot`.
+Download the latest release from this fork's [releases page](../../releases/latest). It's the complete slot card layout, with the same cores, scripts and folders, plus the XMB build of `System/slot`.
 
-- **New install:** follow the [slot guide](https://slot-cfw.fyi), using this zip in place of slot's own release.
-- **Already running slot v1.9.0:** copy only `System/slot` from the zip over the one on your SD card. Your games, saves and settings stay as they are.
+- **New install:** follow the [slot guide](https://slot-cfw.fyi), using this fork's release zip in place of slot's own.
+- **Updating, or switching from slot v1.9.0:** copy `System/slot` from the zip over the one on your SD card. Your games, saves and settings stay as they are.
 
 The boot picture is written to the device the first time the new build runs. It shows from the following boot onwards.
 
