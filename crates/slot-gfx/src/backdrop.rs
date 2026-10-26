@@ -51,8 +51,9 @@ pub struct Backdrop {
 }
 
 /// Original's edges, per colour: the glow trailing below the upper edge (rgb, then its length
-/// in pixels of a 480-line screen), the same below the lower edge, and how much of the sheet's
-/// colour the upper edge brings (the rest comes with the lower).
+/// in pixels of a 480-line screen), the same below the lower edge, then how much of the sheet's
+/// colour the upper edge brings (the rest comes with the lower) and how soft both edges are (half
+/// the width of their step, in the same pixels; 2 when zero).
 pub type BackdropEdges = [[f32; 4]; 3];
 
 /// The picture as it is: not squeezed, brightened or smoothed.
@@ -143,8 +144,10 @@ void main() {
         // Distances below the upper edge and below the lower one.
         float du = max(d1, d2);
         float dl = min(d1, d2);
-        float cu = smoothstep(-2.0 * k, 2.0 * k, du);
-        float cl = smoothstep(-2.0 * k, 2.0 * k, dl);
+        // Each edge is a soft step, two pixels either side unless the colour asks for more.
+        float soft = max(u_e[2].y, 2.0) * k;
+        float cu = smoothstep(-soft, soft, du);
+        float cl = smoothstep(-soft, soft, dl);
         // Two sheets: the upper edge brings part of the sheet's colour, the lower the rest.
         // Below each edge some colours trail a glow of their own.
         col = mix(ground, sheet, cl + u_e[2].x * (cu - cl));
@@ -251,8 +254,9 @@ fn shade_plain(
             ((v - em - 0.055) / (0.92 - em).max(0.05)).clamp(0.0, 1.0),
         );
         let (du, dl) = (d1.max(d2), d1.min(d2));
-        let cu = smoothstep(-2.0 * k, 2.0 * k, du);
-        let cl = smoothstep(-2.0 * k, 2.0 * k, dl);
+        let soft = e[2][1].max(2.0) * k;
+        let cu = smoothstep(-soft, soft, du);
+        let cl = smoothstep(-soft, soft, dl);
         let col = mix3(ground, sheet, cl + e[2][0] * (cu - cl));
         let gu = (-du.max(0.0) / (e[0][3] * k)).exp() * cu;
         let gl = (-dl.max(0.0) / (e[1][3] * k)).exp() * cl;
