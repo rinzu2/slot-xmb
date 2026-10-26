@@ -6,7 +6,7 @@
 
 <p>slot is made by <a href="https://github.com/BrandonKowalski">Brandon Kowalski</a>. All of the emulation, saves, link play and everything else under the skin is his work.</p>
 
-<img src=".github/resources/xmb/startup.gif" width="72%" alt="Powering on: the boot picture, the lines, the colour opening out and the bar fading in">
+<img src=".github/resources/xmb/startup.gif" width="72%" alt="Powering on, then scrolling the games, jumping a letter with R1 and back with L1, and moving between categories">
 
 </div>
 
