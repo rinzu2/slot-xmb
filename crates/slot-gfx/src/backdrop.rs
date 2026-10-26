@@ -139,7 +139,10 @@ void main() {
     vec3 top = side(u_c[0], u_c[1], u_c[2], u);
     // The handheld's own picture for the colour, when it is on the card, a touch brighter on its
     // screen than in the file: the ground under both styles' waves.
-    vec3 picture = clamp(texture2D(u_ground, v_uv).rgb * 1.046 + 0.04, 0.0, 1.0);
+    vec3 picture = vec3(0.0);
+    if (u_has_ground > 0.5) {
+        picture = clamp(texture2D(u_ground, v_uv).rgb * 1.046 + 0.04, 0.0, 1.0);
+    }
     vec3 col;
     vec3 plain;
     if (u_style < 0.5) {

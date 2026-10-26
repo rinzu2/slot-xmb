@@ -976,15 +976,22 @@ impl App {
     }
 
     fn remember_shelf(&mut self) {
+        if self.note_shelf() {
+            self.persist();
+        }
+    }
+
+    /// Notes which game is hovered in the state, without writing it; false if there is none.
+    fn note_shelf(&mut self) -> bool {
         let Some(cart) = self.shelf().carts.get(self.shelf().index) else {
-            return;
+            return false;
         };
         self.state.shelf_cart = Some(Recent {
             platform: cart.platform,
             stem: cart.stem.clone(),
         });
         self.state.shelf = Some(self.shelves[self.shelf_at].0.key());
-        self.persist();
+        true
     }
 
     fn seat_of(&self, stem: &str, platform: Option<Platform>) -> Option<(usize, usize)> {
@@ -2748,9 +2755,11 @@ impl App {
     }
 
     fn open_quick_menu(&mut self) {
-        // Remember the game hovered, so a shutdown from Settings comes back to it.
+        // Remember the game hovered, so a shutdown from Settings comes back to it. Written in
+        // the background, so the slide into Settings doesn't wait on the card.
         if XMB && matches!(self.phase, Phase::Shelf) {
-            self.remember_shelf();
+            self.note_shelf();
+            self.persist_soon();
         }
         self.xmb_pick = None;
         self.xmb_options = None;
