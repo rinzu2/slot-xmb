@@ -53,7 +53,8 @@ pub struct Backdrop {
 /// Original's edges, per colour: the glow trailing below the upper edge (rgb, then its length
 /// in pixels of a 480-line screen), the same below the lower edge, then how much of the sheet's
 /// colour the upper edge brings (the rest comes with the lower) and how soft both edges are (half
-/// the width of their step, in the same pixels; 2 when zero).
+/// the width of their step, in the same pixels; 3 when zero), then a saturation for the whole
+/// picture (1 when zero).
 pub type BackdropEdges = [[f32; 4]; 3];
 
 /// The picture as it is: not squeezed, brightened or smoothed.
@@ -144,8 +145,8 @@ void main() {
         // Distances below the upper edge and below the lower one.
         float du = max(d1, d2);
         float dl = min(d1, d2);
-        // Each edge is a soft step, two pixels either side unless the colour asks for more.
-        float soft = max(u_e[2].y, 2.0) * k;
+        // Each edge is a soft step, three pixels either side unless the colour asks for more.
+        float soft = max(u_e[2].y, 3.0) * k;
         float cu = smoothstep(-soft, soft, du);
         float cl = smoothstep(-soft, soft, dl);
         // Two sheets: the upper edge brings part of the sheet's colour, the lower the rest.
@@ -154,6 +155,10 @@ void main() {
         col += u_e[0].rgb * exp(-max(du, 0.0) / (u_e[0].w * k)) * cu;
         col += u_e[1].rgb * exp(-max(dl, 0.0) / (u_e[1].w * k)) * cl;
         col = clamp(col, 0.0, 1.0);
+        // Some colours run a little less saturated than measured, as this screen is vivid.
+        if (u_e[2].z > 0.0) {
+            col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, u_e[2].z);
+        }
     } else {
         col = mix(top, side(u_c[12], u_c[13], u_c[14], u), smoothstep(0.11, 0.97, v));
         plain = col;
@@ -254,13 +259,22 @@ fn shade_plain(
             ((v - em - 0.055) / (0.92 - em).max(0.05)).clamp(0.0, 1.0),
         );
         let (du, dl) = (d1.max(d2), d1.min(d2));
-        let soft = e[2][1].max(2.0) * k;
+        let soft = e[2][1].max(3.0) * k;
         let cu = smoothstep(-soft, soft, du);
         let cl = smoothstep(-soft, soft, dl);
         let col = mix3(ground, sheet, cl + e[2][0] * (cu - cl));
         let gu = (-du.max(0.0) / (e[0][3] * k)).exp() * cu;
         let gl = (-dl.max(0.0) / (e[1][3] * k)).exp() * cl;
-        ([0, 1, 2].map(|i| (col[i] + e[0][i] * gu + e[1][i] * gl).clamp(0.0, 1.0)), ground)
+        let col = [0, 1, 2].map(|i| (col[i] + e[0][i] * gu + e[1][i] * gl).clamp(0.0, 1.0));
+        // As the shader: some colours a little less saturated.
+        let col = match e[2][2] > 0.0 {
+            true => {
+                let y = 0.299 * col[0] + 0.587 * col[1] + 0.114 * col[2];
+                col.map(|c| y + (c - y) * e[2][2])
+            }
+            false => col,
+        };
+        (col, ground)
     } else {
         let mut col = mix3(top, side(c, 4, u), smoothstep(0.11, 0.97, v));
         let plain = col;
