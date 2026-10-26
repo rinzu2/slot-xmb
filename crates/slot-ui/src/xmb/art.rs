@@ -89,10 +89,7 @@ fn wrench(cx: f32, cy: f32) -> String {
     let pts_handle = [(-5.0, -2.5), (5.0, -2.5), (5.0, 24.0), (-5.0, 24.0)];
     let turn = |(x, y): (f32, f32)| {
         let a = std::f32::consts::FRAC_PI_4;
-        (
-            cx + x * a.cos() - y * a.sin(),
-            cy + x * a.sin() + y * a.cos(),
-        )
+        (cx + x * a.cos() - y * a.sin(), cy + x * a.sin() + y * a.cos())
     };
     let handle: Vec<(f32, f32)> = pts_handle.iter().map(|p| turn(*p)).collect();
     let (hx, hy) = turn((0.0, -14.0));
@@ -101,7 +98,12 @@ fn wrench(cx: f32, cy: f32) -> String {
         .map(|p| turn(*p))
         .collect();
     // The jaw is drawn as part of the cut-out, so it reads as the gap between the ring's ends.
-    format!("{}{}{}", poly(&handle), circle(hx, hy, 12.0), poly(&jaw))
+    format!(
+        "{}{}{}",
+        poly(&handle),
+        circle(hx, hy, 12.0),
+        poly(&jaw)
+    )
 }
 
 fn rrect(x: f32, y: f32, w: f32, h: f32, r: f32) -> String {
@@ -417,11 +419,7 @@ fn downsample(rgba: &[u8], w: u32, h: u32, k: u32) -> Vec<u8> {
             let o = ((y * ow + x) * 4) as usize;
             let a = acc[3] / (k * k) as f32;
             for c in 0..3 {
-                out[o + c] = if acc[3] > 0.0 {
-                    (acc[c] / acc[3]).round() as u8
-                } else {
-                    255
-                };
+                out[o + c] = if acc[3] > 0.0 { (acc[c] / acc[3]).round() as u8 } else { 255 };
             }
             out[o + 3] = a.round() as u8;
         }
@@ -456,11 +454,7 @@ fn with_shadow(rgba: &[u8], s: u32) -> Vec<u8> {
     for y in 0..n {
         for x in 0..n {
             let i = y * n + x;
-            let sh = if y >= drop {
-                soft[(y - drop) * n + x] * 0.32
-            } else {
-                0.0
-            };
+            let sh = if y >= drop { soft[(y - drop) * n + x] * 0.32 } else { 0.0 };
             let fa = alpha[i];
             let a = fa + sh * (1.0 - fa);
             if a <= 0.0 {
@@ -485,6 +479,7 @@ pub fn xmb_icon_face(icon: XmbIcon) -> CartFace {
     let small = downsample(&rgba, big, big, SUPERSAMPLE);
     face(Some(with_shadow(&small, s)), s, s)
 }
+
 
 /// A soft white glow that fades to nothing at its edge, for behind a highlighted icon.
 /// A halo hugging a rectangle, for the highlighted game: drawn in nine slices so it keeps its
@@ -514,10 +509,7 @@ pub fn xmb_glow_face() -> CartFace {
     let mut rgba = vec![0u8; (s * s * 4) as usize];
     for y in 0..s {
         for x in 0..s {
-            let (dx, dy) = (
-                (x as f32 + 0.5) / s as f32 - 0.5,
-                (y as f32 + 0.5) / s as f32 - 0.5,
-            );
+            let (dx, dy) = ((x as f32 + 0.5) / s as f32 - 0.5, (y as f32 + 0.5) / s as f32 - 0.5);
             // A rounded square falloff, so a wide cover glows evenly along its sides.
             let d = (dx.abs().powf(3.0) + dy.abs().powf(3.0)).powf(1.0 / 3.0) * 2.0;
             let a = (1.0 - d).clamp(0.0, 1.0);
@@ -552,11 +544,7 @@ pub fn xmb_cart_halo_face(index: usize) -> (CartFace, [f32; 2]) {
         _ => crate::gb_cart_shadow(crate::GbShell::Rounded),
     };
     let (cw, ch) = (shadow.w as usize, shadow.h as usize);
-    let mask: Vec<f32> = shadow
-        .rgba
-        .chunks_exact(4)
-        .map(|p| p[3] as f32 / 255.0)
-        .collect();
+    let mask: Vec<f32> = shadow.rgba.chunks_exact(4).map(|p| p[3] as f32 / 255.0).collect();
     // As wide as the old square frame was against a cover: about a sixth of the cart's height.
     let m = (ch as f32 * 0.177).round() as usize;
     let (w, h) = (cw + 2 * m, ch + 2 * m);

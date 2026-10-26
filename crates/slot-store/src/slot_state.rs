@@ -309,19 +309,10 @@ pub enum Shader {
     Grid,
     Dot,
     Simpletex,
-    SharpBilinear,
-    LcdGridV2,
 }
 
 impl Shader {
-    pub const GBA: [Shader; 6] = [
-        Shader::Off,
-        Shader::Lcd3x,
-        Shader::Grid,
-        Shader::Dot,
-        Shader::SharpBilinear,
-        Shader::LcdGridV2,
-    ];
+    pub const GBA: [Shader; 4] = [Shader::Off, Shader::Lcd3x, Shader::Grid, Shader::Dot];
     pub const GB: [Shader; 4] = [Shader::Off, Shader::Lcd3x, Shader::Grid, Shader::Simpletex];
 
     pub fn name(self) -> &'static str {
@@ -331,8 +322,6 @@ impl Shader {
             Shader::Grid => "grid",
             Shader::Dot => "dot",
             Shader::Simpletex => "simpletex",
-            Shader::SharpBilinear => "sharp_bilinear",
-            Shader::LcdGridV2 => "lcd_grid_v2",
         }
     }
 
@@ -343,8 +332,6 @@ impl Shader {
             Shader::Grid,
             Shader::Dot,
             Shader::Simpletex,
-            Shader::SharpBilinear,
-            Shader::LcdGridV2,
         ]
         .into_iter()
         .find(|s| s.name() == name)

@@ -492,7 +492,11 @@ fn the_switch_changes_the_name_on_the_band_and_says_nothing() {
         assert_eq!(a.toast(), None, "{btn:?} put a banner up over the carts");
     }
     a.update(5.0);
-    assert_eq!(a.shelf_platform_name(), Some("Game Boy"), "the name faded");
+    assert_eq!(
+        a.shelf_platform_name(),
+        Some("Game Boy"),
+        "the name faded"
+    );
 }
 
 #[test]
@@ -2225,28 +2229,8 @@ fn the_shader_shortcut_steps_the_seated_carts_shader_both_ways_and_names_it() {
         ),
         (
             slot_input::Action::ShaderNext,
-            Shader::SharpBilinear,
-            slot_ui::Toast::ShaderSharpBilinear,
-        ),
-        (
-            slot_input::Action::ShaderNext,
-            Shader::LcdGridV2,
-            slot_ui::Toast::ShaderLcdGridV2,
-        ),
-        (
-            slot_input::Action::ShaderNext,
             Shader::Off,
             slot_ui::Toast::ShaderOff,
-        ),
-        (
-            slot_input::Action::ShaderPrev,
-            Shader::LcdGridV2,
-            slot_ui::Toast::ShaderLcdGridV2,
-        ),
-        (
-            slot_input::Action::ShaderPrev,
-            Shader::SharpBilinear,
-            slot_ui::Toast::ShaderSharpBilinear,
         ),
         (
             slot_input::Action::ShaderPrev,

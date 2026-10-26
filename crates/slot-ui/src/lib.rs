@@ -18,13 +18,13 @@ mod icon;
 mod link_art;
 mod plate;
 mod polaroids;
+mod shot_viewer;
 mod power_menu;
 mod quick_menu;
 mod rebuild;
 mod refusal;
 mod shelf;
 mod shell;
-mod shot_viewer;
 mod silhouette;
 mod slot_chrome;
 mod sticker;
@@ -32,7 +32,6 @@ pub mod text;
 mod toast;
 mod xmb;
 
-pub use art::decode as decode_png;
 pub use backdrop::{
     bezel_face, blur_background, default_background, default_game_bezel_face, draw_backdrop,
     draw_ground, game_bezel_face, wallpaper_face,
@@ -60,23 +59,26 @@ pub use hud::{
     badge_at, ff_badge, footer_ink, FfState, Hud, HudKind, LinkBadge, Millis, ALARM_BAND_H,
     HUD_ICON_PX, HUD_INK, HUD_MS, LINK_HOST_INK, LINK_JOIN_INK, PLATE_H,
 };
-pub use icon::{
-    badge_face, icon_box, icon_face, icon_face_soft, star_face, warm_fonts, Badge, Icon,
-};
+pub use icon::{badge_face, icon_box, icon_face, icon_face_soft, star_face, warm_fonts, Badge, Icon};
 pub use link_art::{
     link_art, LinkArt, ADAPTER_BASE_X, ADAPTER_BASE_Y, ADAPTER_H, ADAPTER_W, ARCS, ARROW_H,
     ARROW_LEFT_X, ARROW_RIGHT_X, ARROW_W, ARROW_Y, CLICKS_H, CLICKS_W, CLICKS_X, CLICKS_Y, PLUG_H,
     PLUG_TIP_X, PLUG_W, PORT_H, PORT_W, PORT_Y,
 };
 pub use plate::{
-    arrows_hint_coloured, arrows_hint_face, arrows_hint_width, cap_width, centred_hints,
-    hint_coloured, hint_face, hint_quad, hint_row, hint_width, pad_hint_face, pad_hint_width,
-    tick_cap_face, title_face, title_line_face, word_face, word_ink, word_width, Hint, UndoFace,
-    ARROW_GAP, CAP, CAP_GAP, HINT_EDGE, HINT_GAP, HINT_H, LEGEND_GAP, TITLE_H, TITLE_LINE_H,
-    TITLE_W,
+    arrows_hint_coloured, arrows_hint_face, arrows_hint_width, cap_width, centred_hints, pad_hint_face,
+    pad_hint_width, tick_cap_face,
+    hint_coloured, hint_face, hint_quad, hint_row, hint_width, title_face, title_line_face,
+    word_face, word_ink, word_width, Hint, UndoFace, ARROW_GAP, CAP, CAP_GAP, HINT_EDGE, HINT_GAP,
+    HINT_H, LEGEND_GAP, TITLE_H, TITLE_LINE_H, TITLE_W,
 };
 pub use polaroids::{
     draw_album_chrome, photo_face, AlbumChrome, PhotoFace, Polaroids, DOT, LEGEND, PHOTO_H, PHOTO_W,
+};
+pub use art::decode as decode_png;
+pub use shot_viewer::{
+    grid_cell, grid_rows_shown, thumbnail, ShotMode, ShotViewer, GRID_COLS, GRID_GAP, MAX_ZOOM, PAN_KEY,
+    PAN_TAP, SHOT_HINTS,
 };
 pub use power_menu::{menu_detail_face, menu_face, PowerChoice, MENU_PAD};
 pub use quick_menu::{
@@ -94,10 +96,6 @@ pub use shell::{
     lookup_order_is_exact_then_family_then_default, shell_for, shell_presets, table_keys, Finish,
     Shell, DEFAULT_SHELL, DMG_SHELL, DUAL_MODE_SHELL, GB_CLEAR_SHELL,
 };
-pub use shot_viewer::{
-    grid_cell, grid_rows_shown, thumbnail, ShotMode, ShotViewer, GRID_COLS, GRID_GAP, MAX_ZOOM,
-    PAN_KEY, PAN_TAP, SHOT_HINTS,
-};
 pub use silhouette::{gb_silhouette, silhouette, GbShell};
 pub use slot_chrome::{
     draw_empty_slot, draw_plugged_slot, draw_slot_name, draw_slot_title, ease, edge, housing,
@@ -109,16 +107,12 @@ pub use sticker::{
 };
 pub use toast::{toast_box, toast_face, toast_rect, Toast};
 pub use xmb::{
-    civil as xmb_civil, classic_lines, month_of, original_edges, xmb_backdrop_colours,
-    xmb_backdrop_edges, xmb_boot_picture, xmb_cart_halo_face, xmb_clock_text, xmb_colour_index,
-    xmb_curves, xmb_curves_at, xmb_date_time_text, xmb_flare_face, xmb_foot_face,
-    xmb_frame_glow_face, xmb_glow_face, xmb_ground_faces, xmb_halo_index, xmb_icon_face,
-    xmb_intro_shape, xmb_loading_ring, xmb_outro_t, xmb_pale, xmb_pause_colours, xmb_pause_edges,
-    xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_ring_face, xmb_swatch,
-    xmb_text_face, xmb_title_alpha, xmb_title_face, Xmb, XmbArt, XmbCat, XmbClockEdit, XmbEntry,
-    XmbIcon, XmbIntro, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes, XmbText,
-    XMB_COLOUR_COUNT, XMB_DATE_FORMATS, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS, XMB_HALOS,
-    XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_TITLE,
-    XMB_INTRO_WAVES, XMB_MONTHS, XMB_OUTRO_SECS, XMB_PALETTE, XMB_TIME_FORMATS, XMB_WAVE_CLASSIC,
-    XMB_WAVE_ORIGINAL,
+    classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
+    xmb_curves,
+    xmb_curves_at, xmb_flare_face, xmb_intro_shape, xmb_pale, xmb_loading_ring, xmb_outro_t, xmb_ring_face,
+    XmbIntro, xmb_boot_picture, xmb_foot_face, xmb_title_alpha, xmb_title_face, XMB_INTRO_TITLE, XMB_INTRO_BAR, XMB_INTRO_BLOOM, XMB_INTRO_CLOCK, XMB_INTRO_END, XMB_INTRO_WAVES,
+    XMB_OUTRO_SECS,
+    xmb_cart_halo_face, xmb_ground_faces, XMB_GROUND_MONTHS, XMB_GROUND_OTHERS, xmb_halo_index, XMB_HALOS, xmb_frame_glow_face, xmb_glow_face, xmb_icon_face, xmb_picker_centred, xmb_picker_first, xmb_picker_open, xmb_swatch, xmb_text_face, Xmb,
+    XmbArt, XmbCat, XmbClockEdit, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,
+    XmbText, XMB_COLOUR_COUNT, XMB_MONTHS, XMB_PALETTE, XMB_WAVE_CLASSIC, XMB_WAVE_ORIGINAL,
 };

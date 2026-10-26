@@ -60,9 +60,7 @@ fn font() -> Option<&'static Font> {
 }
 
 fn width(font: &Font, text: &str, px: f32) -> f32 {
-    text.chars()
-        .map(|c| font.metrics(c, px).advance_width)
-        .sum()
+    text.chars().map(|c| font.metrics(c, px).advance_width).sum()
 }
 
 /// `text`, shortened at a word boundary with an ellipsis until it fits `max`.

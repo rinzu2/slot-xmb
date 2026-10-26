@@ -612,18 +612,3 @@ fn lid_power_off_minutes_round_trip_and_drop_a_value_the_menu_does_not_offer() {
     std::fs::write(&path, text).unwrap();
     assert_eq!(read_slot_state(d.path()).lid_off_min, None);
 }
-
-#[test]
-fn the_new_gba_shaders_round_trip_and_stay_off_the_game_boy() {
-    for shader in [Shader::SharpBilinear, Shader::LcdGridV2] {
-        let d = tmp_root();
-        let mut s = read_slot_state(d.path());
-        s.shader_gba = shader;
-        write_slot_state(d.path(), &s).unwrap();
-        assert_eq!(read_slot_state(d.path()).shader_gba, shader);
-        assert!(
-            !Shader::GB.contains(&shader),
-            "{shader:?} reached the Game Boy list"
-        );
-    }
-}

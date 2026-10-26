@@ -30,9 +30,7 @@ fn placed(s: &Shelf) -> Vec<(f32, f32)> {
             Draw::Tex { x, w, .. } => (x, w),
             Draw::Part { x, w, .. } => (x, w),
             Draw::Turned { x, w, .. } => (x, w),
-            Draw::Game | Draw::Shot { .. } | Draw::Capture | Draw::Backdrop(_) => {
-                (0.0, OUT_W as f32)
-            }
+            Draw::Game | Draw::Shot { .. } | Draw::Capture | Draw::Backdrop(_) => (0.0, OUT_W as f32),
         })
         .collect()
 }

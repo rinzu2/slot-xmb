@@ -3,10 +3,10 @@ use std::time::{Duration, Instant};
 use slot_gfx::{Compositor, Draw, ScreenEffect, TexId, OUT_H, OUT_W};
 
 const PAPER: &[u8] = include_bytes!("../assets/paper.png");
-use crate::shot_loader::{ShotLoader, Want};
 use slot_input::{InputSource, Millis};
 use slot_power::{Platform, Power};
 use slot_store::{format_stamp, BezelPick, Platform as Console};
+use crate::shot_loader::{ShotLoader, Want};
 use slot_ui::{
     badge_face, bezel_face, cart_shadow, chip_face, chip_shadow_face, core_button_legends,
     date_time_text, default_game_bezel_face, delete_legends, footer_ink, game_bezel_face,
@@ -156,8 +156,7 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
         xs.built = true;
         for icon in slot_ui::XmbIcon::ALL {
             let f = slot_ui::xmb_icon_face(icon);
-            xs.art.icons[icon.index()] =
-                Some(compositor.create_texture_mipmapped(f.w, f.h, &f.rgba));
+            xs.art.icons[icon.index()] = Some(compositor.create_texture_mipmapped(f.w, f.h, &f.rgba));
         }
         let g = slot_ui::xmb_glow_face();
         xs.art.glow = Some(compositor.create_texture(g.w, g.h, &g.rgba));
@@ -192,10 +191,7 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
     let colour = app.xmb_colour();
     if xs.ground_for != Some(colour) {
         xs.ground_for = Some(colour);
-        let face = xs
-            .grounds
-            .as_deref()
-            .and_then(|g| crate::xmb_ground::face(g, colour));
+        let face = xs.grounds.as_deref().and_then(|g| crate::xmb_ground::face(g, colour));
         xs.art.ground = match (face, xs.art.ground) {
             (Some(f), Some(id)) => {
                 compositor.update_texture(id, f.w, f.h, &f.rgba);
@@ -226,10 +222,7 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
             app.xmb_intro_waves(),
             &mut xs.curves,
         );
-        let (w, h) = (
-            slot_gfx::BACKDROP_COLS as u32,
-            slot_gfx::BACKDROP_ROWS as u32,
-        );
+        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
         match xs.art.curves {
             Some(id) => compositor.update_texture(id, w, h, &xs.curves),
             // Nearest filtering: each texel packs 16-bit values that must not be blended.
@@ -416,11 +409,7 @@ impl Frontend {
             .collect();
         self.session.app_mut().set_shot_hint_faces(shot_hints);
         let tick = slot_ui::tick_cap_face();
-        let tick = (
-            compositor.create_texture(tick.w, tick.h, &tick.rgba),
-            tick.w,
-            tick.h,
-        );
+        let tick = (compositor.create_texture(tick.w, tick.h, &tick.rgba), tick.w, tick.h);
         self.session.app_mut().set_shot_tick_face(tick);
         let hint = set_clock_hint_face();
         self.clocks.hint = Some(compositor.create_texture(hint.w, hint.h, &hint.rgba));
@@ -711,8 +700,6 @@ impl Frontend {
             slot_store::Shader::Grid => ScreenEffect::Grid,
             slot_store::Shader::Dot => ScreenEffect::Dot,
             slot_store::Shader::Simpletex => ScreenEffect::Simpletex,
-            slot_store::Shader::SharpBilinear => ScreenEffect::SharpBilinear,
-            slot_store::Shader::LcdGridV2 => ScreenEffect::LcdGridV2,
         });
         compositor.set_shake(self.session.app().screen_shake());
         compositor.set_screen_power(self.session.app().screen_power());
@@ -1265,9 +1252,7 @@ fn sync_gallery(app: &mut App, compositor: &mut Compositor, state: &mut Switcher
     }
     for l in loader.poll() {
         match l.want {
-            Want::Thumb
-                if state.window.contains(&l.path) && !state.thumbs.contains_key(&l.path) =>
-            {
+            Want::Thumb if state.window.contains(&l.path) && !state.thumbs.contains_key(&l.path) => {
                 let id = match state.spare.pop() {
                     Some(id) => {
                         compositor.update_texture(id, l.w, l.h, &l.rgba);
@@ -1302,10 +1287,7 @@ fn sync_gallery(app: &mut App, compositor: &mut Compositor, state: &mut Switcher
                 app.set_shot_face(Some((id, l.w, l.h)));
                 state.full_pending = None;
                 if let Some(at) = state.full_asked.take() {
-                    eprintln!(
-                        "slot: gallery: full shot in {} ms",
-                        at.elapsed().as_millis()
-                    );
+                    eprintln!("slot: gallery: full shot in {} ms", at.elapsed().as_millis());
                 }
             }
             _ => {}

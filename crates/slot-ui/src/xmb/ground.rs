@@ -14,18 +14,11 @@ pub const XMB_GROUND_MONTHS: [&str; 2] = ["01-12_03g.bmp", "01-12.bmp"];
 
 /// Every 24-bit picture in `bytes`, one after another.
 fn pictures(bytes: &[u8]) -> Vec<CartFace> {
-    let u32_at = |i: usize| -> Option<u32> {
-        Some(u32::from_le_bytes(bytes.get(i..i + 4)?.try_into().ok()?))
-    };
+    let u32_at = |i: usize| -> Option<u32> { Some(u32::from_le_bytes(bytes.get(i..i + 4)?.try_into().ok()?)) };
     let mut out = Vec::new();
     let mut at = 0usize;
     while at + 54 <= bytes.len() && &bytes[at..at + 2] == b"BM" {
-        let (Some(size), Some(off), Some(w), Some(h)) = (
-            u32_at(at + 2),
-            u32_at(at + 10),
-            u32_at(at + 18),
-            u32_at(at + 22),
-        ) else {
+        let (Some(size), Some(off), Some(w), Some(h)) = (u32_at(at + 2), u32_at(at + 10), u32_at(at + 18), u32_at(at + 22)) else {
             break;
         };
         let (w, h) = (w as i32, h as i32);

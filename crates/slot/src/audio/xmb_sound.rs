@@ -105,8 +105,7 @@ pub fn parse_wav(bytes: &[u8]) -> Option<Clip> {
         return None;
     }
     let u16_at = |i: usize| u16::from_le_bytes([bytes[i], bytes[i + 1]]);
-    let u32_at =
-        |i: usize| u32::from_le_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]);
+    let u32_at = |i: usize| u32::from_le_bytes([bytes[i], bytes[i + 1], bytes[i + 2], bytes[i + 3]]);
     let mut at = 12;
     let (mut channels, mut rate, mut bits, mut format) = (0u16, 0u32, 0u16, 0u16);
     let mut data: Option<&[u8]> = None;
