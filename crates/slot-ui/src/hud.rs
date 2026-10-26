@@ -340,8 +340,8 @@ impl Hud {
 
     /// The level as a row of segments near the bottom of the screen, its icon to the left, on a
     /// soft dark band.
-    /// The handheld's level gauge, measured off its screen: along the foot of the screen, the
-    /// icon at the left, then a tick for every step at a fixed spacing, so a scale with fewer
+    /// The handheld's level gauge, measured off its screen: centred along the foot of the
+    /// screen, the icon first, then a tick for every step at a fixed spacing, so a scale with fewer
     /// steps (brightness, screen temperature) makes a shorter gauge. Steps reached are short
     /// upright bars, the rest dots, each with a soft shadow.
     fn draw_segments(&self, canvas: Canvas, alpha: f32, out: &mut Vec<Draw>) {
@@ -363,9 +363,14 @@ impl Hud {
         let (iw, ih) = icon_box(HUD_ICON_PX);
         let scale = (h * 0.07) / ih as f32;
         let (iw, ih) = (iw as f32 * scale, ih as f32 * scale);
+        let pitch = w * 0.0249;
+        let bar_w = (w * 0.0058).round().max(2.0);
+        // The icon, a gap, then the ticks, the whole gauge centred along the foot.
+        let span = iw / 2.0 + w * (0.137 - 0.084) + (max.max(1) - 1) as f32 * pitch + bar_w / 2.0;
+        let icon_x = (w - span) / 2.0 + iw / 2.0;
         if let Some(tex) = self.icon() {
             out.push(Draw::Tex {
-                x: (w * 0.084 - iw / 2.0).round(),
+                x: (icon_x - iw / 2.0).round(),
                 y: (y - ih / 2.0).round(),
                 w: iw,
                 h: ih,
@@ -373,9 +378,7 @@ impl Hud {
                 alpha,
             });
         }
-        let x0 = w * 0.137;
-        let pitch = w * 0.0249;
-        let bar_w = (w * 0.0058).round().max(2.0);
+        let x0 = icon_x + w * (0.137 - 0.084);
         let bar_h = (h * 0.042).round();
         let dot = (h * 0.008).round().max(2.0);
         let shadow = (1.5 * s).round().max(1.0);
