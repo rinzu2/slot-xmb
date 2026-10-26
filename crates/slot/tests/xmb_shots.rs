@@ -762,3 +762,25 @@ fn a_game_fades_up_from_black_without_the_television_effect() {
         "faded up after a second"
     );
 }
+
+#[test]
+fn leaving_a_game_fades_it_down_into_black() {
+    let d = root(SlotState::default());
+    let mut a = app_playing_in(d.path(), "Golden Sun");
+    a.set_panel((640, 480));
+    a.set_game_ready(true);
+    for _ in 0..30 {
+        a.update(1.0 / 30.0);
+    }
+    a.apply(Action::Eject);
+    a.update(0.1);
+    assert_eq!(a.screen_power(), 1.0, "no switch-off effect");
+    let mut out = Vec::new();
+    a.draw(&mut out);
+    let game = out.iter().position(|d| matches!(d, Draw::Game)).expect("the game still shows");
+    let fade = out[game..].iter().find_map(|d| match d {
+        Draw::Rect { colour, .. } if colour[..3] == [0.0, 0.0, 0.0] => Some(colour[3]),
+        _ => None,
+    });
+    assert!(fade.is_some_and(|a| a > 0.0 && a < 1.0), "black fading over the game: {fade:?}");
+}

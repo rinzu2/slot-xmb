@@ -829,7 +829,8 @@ impl App {
     pub(super) fn draw_xmb_in_game(&self, row: QuickRow, out: &mut Vec<Draw>) {
         let t = self.xmb_textures();
         let scene = self.xmb_in_game_scene(row, &t);
-        let backdrop = self.xmb_backdrop(0.9);
+        // The game shows only faintly through the bar.
+        let backdrop = self.xmb_backdrop(0.96);
         self.xmb_draw_scene(&scene, backdrop, 0.0, 1.0, out);
     }
 

@@ -56,8 +56,10 @@ pub const EJECT_S: f32 = SEATED_AT;
 const EJECT_HOLD_S: f32 = 0.35;
 
 const POWER_ON_S: f32 = 0.22;
-/// With the bar, how long a game takes to fade up out of black.
-const XMB_FADE_UP_S: f32 = 0.4;
+/// With the bar, how long a game takes to fade up out of black, or down into it.
+const XMB_FADE_S: f32 = 0.3;
+/// With the bar, how much quicker than the cartridge's the fades into and out of a game run.
+const XMB_PACE: f32 = 1.35;
 /// With the bar, how long to wait for a game's first picture before fading up anyway.
 const XMB_FADE_WAIT_S: f32 = 1.5;
 
@@ -3528,6 +3530,8 @@ impl App {
         }
         let mut touched = false;
         let at = self.shelf_at;
+        // The bar's fades into and out of a game run a little quicker than the cartridge.
+        let pace = if XMB { XMB_PACE } else { 1.0 };
         let next = match &mut self.phase {
             Phase::Shelf => {
                 let shelf = &mut self.shelves[at].1;
@@ -3543,7 +3547,7 @@ impl App {
                 ..
             } => {
                 let was = *t;
-                *t += dt;
+                *t += dt * pace;
                 let at = SEATED_AT - Sfx::Insert.lead();
                 touched = !*resumed && was < at && *t >= at;
                 (*t >= INSERT_S && *core_ready).then(|| Phase::Playing {
@@ -3553,7 +3557,7 @@ impl App {
             Phase::Ejecting { t, .. } => {
                 if self.screen <= 0.0 {
                     let was = *t;
-                    *t += dt;
+                    *t += dt * pace;
                     touched = was < 0.0 && *t >= 0.0;
                 }
                 (*t >= EJECT_S).then_some(Phase::Shelf)
@@ -3594,10 +3598,11 @@ impl App {
             // With the bar the game fades up from black once it has a picture to show (or, if
             // none comes, after a moment, so the screen is never stuck black).
             && (!XMB || self.game_ready || self.blank_s > XMB_FADE_WAIT_S);
-        let step = if lit {
-            dt / if XMB { XMB_FADE_UP_S } else { POWER_ON_S }
-        } else {
-            -dt / POWER_OFF_S
+        let step = match (lit, XMB) {
+            (true, true) => dt / XMB_FADE_S,
+            (true, false) => dt / POWER_ON_S,
+            (false, true) => -dt / XMB_FADE_S,
+            (false, false) => -dt / POWER_OFF_S,
         };
         self.screen = (self.screen + step).clamp(0.0, 1.0);
         let docked = matches!(
@@ -3791,10 +3796,10 @@ impl App {
     }
 
     /// How far the game's screen has switched on, for the old-television effect. With the bar a
-    /// game comes up out of black at full size instead (the fade is drawn over it), so the
-    /// effect is held at its end; switching a game off still plays it.
+    /// game fades up out of black and back into it at full size instead (the fade is drawn over
+    /// it), so the effect is held at its end.
     pub fn screen_power(&self) -> f32 {
-        match XMB && !matches!(self.phase, Phase::Ejecting { .. }) {
+        match XMB {
             true => 1.0,
             false => self.screen,
         }
@@ -4283,8 +4288,11 @@ impl App {
             }
             Phase::Ejecting { .. } if XMB => {
                 if self.shows_game() || self.screen > 0.0 {
+                    // The game fades down into black, then the bar fades up out of it.
                     self.xmb_black(1.0, out);
                     self.push_game(out);
+                    let up = self.screen * self.screen * (3.0 - 2.0 * self.screen);
+                    self.xmb_black(1.0 - up, out);
                 } else {
                     self.draw_xmb(1.0 - self.seat(), out);
                     self.xmb_black(self.seat(), out);
