@@ -152,22 +152,24 @@ struct XmbSync {
 
 /// The PS3's scene and what it was last told.
 pub struct ModernSync {
-    pub scene: slot_ui::xmb_modern::ModernScene,
+    pub scene: slot_ui::xmb_modern::ModernWorker,
     time: Option<f32>,
     /// Whether its start has played, or the bar's start is over without one.
     booted: bool,
     look: Option<crate::app::ModernLook>,
     place: Option<(i32, i32)>,
+    timing: (f64, f64, u32),
 }
 
 impl ModernSync {
-    pub fn new(scene: slot_ui::xmb_modern::ModernScene, booted: bool) -> Self {
+    pub fn new(scene: slot_ui::xmb_modern::ModernWorker, booted: bool) -> Self {
         ModernSync {
             scene,
             time: None,
             booted,
             look: None,
             place: None,
+            timing: (0.0, 0.0, 0),
         }
     }
 }
@@ -175,7 +177,7 @@ impl ModernSync {
 impl ModernSync {
     /// The frame `drive` last returned.
     pub fn frame(&self) -> &slot_gfx::ModernFrame {
-        self.scene.last_frame()
+        self.scene.frame()
     }
 
     /// Moves the scene on to where the bar is, and returns the frame to draw: the colour the bar
@@ -212,7 +214,7 @@ impl ModernSync {
         let dt = self.time.map_or(1.0 / 60.0, |was| now - was);
         // A long gap (frames held back, a test's settling) is run through in steps; a jump of
         // the clock is not.
-        let mut dt = if (0.0..30.0).contains(&dt) { dt as f64 } else { 1.0 / 60.0 };
+        let dt = if (0.0..30.0).contains(&dt) { dt as f64 } else { 1.0 / 60.0 };
         self.time = Some(now);
         let place = app.xmb_place();
         let mut steps = Vec::new();
@@ -228,23 +230,35 @@ impl ModernSync {
         let canvas = app.canvas();
         let aspect = (canvas.w / canvas.h.max(1.0)) as f64;
         let wall = Wall::of(app.wall_secs() as f64);
-        let mut steps = &steps[..];
-        while dt > 0.0 {
-            let step = dt.min(1.0 / 30.0);
-            self.scene.advance(step, wall, steps, None, aspect);
-            steps = &[];
-            dt -= step;
-        }
-        self.scene.frame()
+        self.scene.advance(dt, wall, &steps, aspect)
     }
 }
 
 fn sync_modern(app: &App, compositor: &mut Compositor, xs: &mut XmbSync) {
     let m = xs
         .modern
-        .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernScene::new(None), false));
+        .get_or_insert_with(|| {
+            let scene = slot_ui::xmb_modern::ModernScene::new(None);
+            ModernSync::new(slot_ui::xmb_modern::ModernWorker::new(scene), false)
+        });
+    let began = std::time::Instant::now();
     let frame = m.drive(app, xs.grounds.as_deref());
+    let waited = began.elapsed();
     compositor.set_modern(frame);
+    // Every so often, how long the frame waited for the scene and took to hand it over: if it
+    // waits, the scene's thread is what holds the frame rate back.
+    m.timing.0 += waited.as_secs_f64();
+    m.timing.1 += began.elapsed().as_secs_f64();
+    m.timing.2 += 1;
+    if m.timing.2 >= 600 {
+        let n = m.timing.2 as f64;
+        eprintln!(
+            "slot: modern: {:.2} ms a frame waiting for the scene, {:.2} ms with its upload",
+            m.timing.0 * 1000.0 / n,
+            m.timing.1 * 1000.0 / n
+        );
+        m.timing = (0.0, 0.0, 0);
+    }
 }
 
 fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {

@@ -318,7 +318,7 @@ struct BootIntro {
     foot: slot_gfx::TexId,
     ground: Option<slot_gfx::TexId>,
     /// Modern's scene, and whether its start has begun, until the frontend takes it on.
-    modern: Option<(slot_ui::xmb_modern::ModernScene, bool)>,
+    modern: Option<(slot_ui::xmb_modern::ModernWorker, bool)>,
     buf: Vec<u8>,
     draws: Vec<slot_gfx::Draw>,
     last: Option<Instant>,
@@ -378,7 +378,7 @@ impl BootIntro {
                 let face = slot::xmb_ground::face(&grounds, colour).map(|f| (f.w, f.h, &f.rgba[..]));
                 scene.set_colour(ModernColour::Picture(xmb_modern_picture(colour, face)));
             }
-            (scene, false)
+            (slot_ui::xmb_modern::ModernWorker::new(scene), false)
         });
         Some(BootIntro {
             started: Instant::now(),
@@ -449,14 +449,13 @@ impl BootIntro {
             let (w, h) = self.window;
             let dt = (t - self.modern_at) as f64;
             self.modern_at = t;
-            scene.advance(
-                dt,
+            let frame = scene.advance(
+                dt.max(0.0),
                 slot_ui::xmb_modern::Wall::of(wall),
                 &[],
-                None,
                 w as f64 / h.max(1) as f64,
             );
-            compositor.set_modern(scene.frame());
+            compositor.set_modern(frame);
         }
         slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
         let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);

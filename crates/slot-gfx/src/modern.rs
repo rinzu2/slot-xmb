@@ -72,6 +72,9 @@ pub struct ModernBackdrop {
     pub serial: u64,
     /// A count of the textures' changes: a new one is uploaded.
     pub textures: u64,
+    /// Whether this moment eases in from black, as the XMB's start's does, rather than from the
+    /// backdrop as it stood.
+    pub from_black: bool,
 }
 
 /// What the sparkles' programs read.
@@ -314,8 +317,10 @@ void main() {
 
 // LinesController.fpo: the backdrop under BACKGROUND.mnu's vertical gradient, plus the wave's
 // light read back out of its two channels under the horizontal one, through the preexpose
-// tables' tone curve; alpha is the glare's mask.
-const COMPOSITE_FRAG: &str = r#"
+// tables' tone curve; alpha is the glare's mask. The console writes it to a screen of its own,
+// which the glare and the display read; here both work it out where they read it, which saves
+// the handheld's GPU a whole screen written and read back each frame.
+const COMPOSITE_FN: &str = r#"
 uniform sampler2D u_back;
 uniform sampler2D u_wave;
 uniform sampler2D u_noise;
@@ -329,10 +334,11 @@ uniform float u_white_sqr_rcp;
 uniform float u_threshold;
 uniform float u_gamma;
 vec3 tone(vec3 x) { return x * (1.0 + x * u_white_sqr_rcp) / (1.0 + x); }
-void main() {
-    vec2 uv = gl_FragCoord.xy / u_screen;
+// The screen's pixel at `pix`, as the console's 8-bit screen holds it.
+vec4 composite_at(vec2 pix) {
+    vec2 uv = pix / u_screen;
     vec3 back = texture2D(u_back, uv).rgb * mix(u_colour2, u_colour1, uv.y);
-    vec2 code = texture2D(u_wave, (gl_FragCoord.xy + 0.25) / u_screen).rg;
+    vec2 code = texture2D(u_wave, (pix + 0.25) / u_screen).rg;
     float light = code.r * 0.03125 + code.g * 0.5;
     vec3 lit = back + light * mix(u_colour3, u_colour4, uv.x);
     vec3 texel = clamp(lit * 8.0 - 0.5, 0.0, 127.0);
@@ -342,19 +348,18 @@ void main() {
     if (top > 0.0) {
         mask = (top - u_threshold) * top / (8.0 * min(top, 1.0));
     }
-    vec3 noise = texture2D(u_noise, gl_FragCoord.xy / 32.0).rgb;
-    FRAG_COLOR = vec4(y + noise * 0.125, mask);
+    vec3 noise = texture2D(u_noise, pix / 32.0).rgb;
+    return clamp(vec4(y + noise * 0.125, mask), 0.0, 1.0);
 }
 "#;
 
 // GlareSourcePre.fpo: the screen times its mask, times 8 (over `u_scale`'s range in bytes).
 const SOURCE_FRAG: &str = r#"
-uniform sampler2D u_src;
 uniform float u_scale;
 varying vec2 v_uv;
 void main() {
-    vec4 s = texture2D(u_src, v_uv);
-    FRAG_COLOR = vec4(s.rgb * clamp(s.a, 0.0, 1.0) * 8.0 * u_scale, 0.0);
+    vec4 s = composite_at(v_uv * u_screen);
+    FRAG_COLOR = vec4(s.rgb * s.a * 8.0 * u_scale, 0.0);
 }
 "#;
 
@@ -363,10 +368,13 @@ const GAUSSIAN_FRAG: &str = r#"
 uniform sampler2D u_src;
 uniform vec2 u_step;
 uniform vec3 u_weights[8];
+uniform float u_taps;
 varying vec2 v_uv;
 void main() {
     vec3 sum = texture2D(u_src, v_uv).rgb * u_weights[0];
     for (int k = 1; k < 8; k++) {
+        // Past the widest channel's reach every weight is 0.
+        if (float(k) > u_taps) break;
         vec2 d = u_step * float(k);
         sum += (texture2D(u_src, v_uv + d).rgb + texture2D(u_src, v_uv - d).rgb) * u_weights[k];
     }
@@ -399,17 +407,14 @@ void main() {
 // screen - here into the bar's own frame, at the scene's brightness and `u_alpha` over what is
 // under it.
 const DISPLAY_FRAG: &str = r#"
-uniform sampler2D u_screen_tex;
 uniform sampler2D u_glare;
-uniform sampler2D u_noise;
-uniform vec2 u_screen;
 uniform float u_glare_weight;
 uniform float u_glare_on;
 uniform float u_fade;
 uniform float u_alpha;
 void main() {
     vec2 uv = gl_FragCoord.xy / u_screen;
-    vec3 screen = texture2D(u_screen_tex, uv).rgb;
+    vec3 screen = composite_at(gl_FragCoord.xy).rgb;
     vec3 glare = texture2D(u_glare, uv).rgb * u_glare_weight;
     vec3 noise = texture2D(u_noise, gl_FragCoord.xy / 32.0).rgb;
     FRAG_COLOR = vec4((screen + u_glare_on * clamp(glare - noise * 0.125, 0.0, 1.0)) * u_fade, u_alpha);
@@ -587,6 +592,21 @@ void main() {
 }
 "#;
 
+const COMPOSITE_UNIFORMS: [&str; 12] = [
+    "u_back",
+    "u_wave",
+    "u_noise",
+    "u_screen",
+    "u_colour1",
+    "u_colour2",
+    "u_colour3",
+    "u_colour4",
+    "u_exposure",
+    "u_white_sqr_rcp",
+    "u_threshold",
+    "u_gamma",
+];
+
 /// A texture with a framebuffer of its own.
 struct Target {
     tex: gl::types::GLuint,
@@ -619,6 +639,16 @@ impl Target {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, self.fbo);
             gl::Viewport(0, 0, self.w, self.h);
+        }
+    }
+
+    /// Binds a target the next pass covers whole: cleared first, so that a tiled GPU, as the
+    /// handheld's is, starts it afresh rather than reading the last frame's back in.
+    fn bind_whole(&self) {
+        self.bind();
+        unsafe {
+            gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+            gl::Clear(gl::COLOR_BUFFER_BIT);
         }
     }
 }
@@ -873,7 +903,6 @@ pub struct ModernPass {
     back: Program,
     music: Program,
     copy: Program,
-    composite: Program,
     source: Program,
     gaussian: Program,
     accumulate: Program,
@@ -899,7 +928,11 @@ pub struct ModernPass {
     snapshot: Target,
     float: bool,
     glare: Option<Glare>,
-    screen: Option<(Target, Target)>,
+    /// The wave's light, the screen's size.
+    screen: Option<Target>,
+    /// The attributes each program reads, looked up once.
+    wave_attribs: [gl::types::GLuint; 3],
+    sparkle_attribs: [[gl::types::GLuint; 3]; 2],
     frame: ModernFrame,
     months_at: u64,
     serial: Option<u64>,
@@ -958,26 +991,12 @@ impl ModernPass {
         )?;
         let music = Program::new(FULL_VERT, MUSIC_FRAG, &["u_day_time", "u_alpha"])?;
         let copy = Program::new(FULL_VERT, COPY_FRAG, &["u_src", "u_scale"])?;
-        let composite = Program::new(
+        let source = Program::new(
             FULL_VERT,
-            COMPOSITE_FRAG,
-            &[
-                "u_back",
-                "u_wave",
-                "u_noise",
-                "u_screen",
-                "u_colour1",
-                "u_colour2",
-                "u_colour3",
-                "u_colour4",
-                "u_exposure",
-                "u_white_sqr_rcp",
-                "u_threshold",
-                "u_gamma",
-            ],
+            &format!("{COMPOSITE_FN}{SOURCE_FRAG}"),
+            &[&COMPOSITE_UNIFORMS[..], &["u_scale"]].concat(),
         )?;
-        let source = Program::new(FULL_VERT, SOURCE_FRAG, &["u_src", "u_scale"])?;
-        let gaussian = Program::new(FULL_VERT, GAUSSIAN_FRAG, &["u_src", "u_step", "u_weights"])?;
+        let gaussian = Program::new(FULL_VERT, GAUSSIAN_FRAG, &["u_src", "u_step", "u_weights", "u_taps"])?;
         let accumulate = Program::new(
             FULL_VERT,
             ACCUMULATE_FRAG,
@@ -985,17 +1004,8 @@ impl ModernPass {
         )?;
         let display = Program::new(
             FULL_VERT,
-            DISPLAY_FRAG,
-            &[
-                "u_screen_tex",
-                "u_glare",
-                "u_noise",
-                "u_screen",
-                "u_glare_weight",
-                "u_glare_on",
-                "u_fade",
-                "u_alpha",
-            ],
+            &format!("{COMPOSITE_FN}{DISPLAY_FRAG}"),
+            &[&COMPOSITE_UNIFORMS[..], &["u_glare", "u_glare_weight", "u_glare_on", "u_fade", "u_alpha"]].concat(),
         )?;
         let sparkle_uniforms = [
             "u_mvp",
@@ -1030,6 +1040,9 @@ impl ModernPass {
             &sparkle_uniforms,
         )?;
 
+        let wave_attribs = [wave.attrib("a_pos"), wave.attrib("a_normal"), wave.attrib("a_uv")];
+        let sparkle_attribs = [&sparkle_quads, &sparkle_glare]
+            .map(|p| [p.attrib("a_pos"), p.attrib("a_place"), p.attrib("a_turn")]);
         let mut vao = 0;
         if !crate::gl::es() {
             unsafe {
@@ -1112,7 +1125,6 @@ impl ModernPass {
             back,
             music,
             copy,
-            composite,
             source,
             gaussian,
             accumulate,
@@ -1139,6 +1151,8 @@ impl ModernPass {
             float,
             glare,
             screen: None,
+            wave_attribs,
+            sparkle_attribs,
             frame: ModernFrame::default(),
             months_at: 0,
             serial: None,
@@ -1150,22 +1164,24 @@ impl ModernPass {
     pub fn set_frame(&mut self, f: &ModernFrame) {
         unsafe {
             if f.mesh.len() >= MODERN_VERTICES * MODERN_RECORD {
+                // A fresh store each frame: the GPU may still be drawing from the last one, which
+                // a write into it would wait for or copy.
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.mesh_buf);
-                gl::BufferSubData(
+                gl::BufferData(
                     gl::ARRAY_BUFFER,
-                    0,
                     (MODERN_VERTICES * MODERN_RECORD * 4) as isize,
                     f.mesh.as_ptr() as _,
+                    gl::STREAM_DRAW,
                 );
             }
             let n = f.sparkle_count.min(MODERN_SPARKLES).min(f.sparkles.len() / (4 * MODERN_SPARKLE_VERTEX));
             if n > 0 {
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.sparkle_buf);
-                gl::BufferSubData(
+                gl::BufferData(
                     gl::ARRAY_BUFFER,
-                    0,
                     (n * 4 * MODERN_SPARKLE_VERTEX * 4) as isize,
                     f.sparkles.as_ptr() as _,
+                    gl::STREAM_DRAW,
                 );
             }
         }
@@ -1216,15 +1232,11 @@ impl ModernPass {
     }
 
     fn screen_targets(&mut self, w: i32, h: i32) -> bool {
-        if self.screen.as_ref().is_some_and(|(s, _)| s.w == w && s.h == h) {
+        if self.screen.as_ref().is_some_and(|s| s.w == w && s.h == h) {
             return true;
         }
-        self.screen = None;
-        let (Some(wave), Some(screen)) = (Target::new(w, h, false), Target::new(w, h, false)) else {
-            return false;
-        };
-        self.screen = Some((wave, screen));
-        true
+        self.screen = Target::new(w, h, false);
+        self.screen.is_some()
     }
 
     fn full(&self, quad: &crate::quad::Quad) {
@@ -1263,8 +1275,10 @@ impl ModernPass {
         if self.serial != Some(b.serial) {
             let first = self.serial.is_none();
             self.serial = Some(b.serial);
-            if !first {
-                self.snapshot.bind();
+            if b.from_black {
+                self.snapshot.bind_whole();
+            } else if !first {
+                self.snapshot.bind_whole();
                 self.copy.use_();
                 self.copy.i1("u_src", 0);
                 self.copy.f1("u_scale", 1.0);
@@ -1272,7 +1286,7 @@ impl ModernPass {
                 self.full(quad);
             }
         }
-        self.back_target.bind();
+        self.back_target.bind_whole();
         self.copy.use_();
         self.copy.i1("u_src", 0);
         self.copy.f1("u_scale", 1.0);
@@ -1302,7 +1316,7 @@ impl ModernPass {
 
     /// The wave adds its light into its own buffer, red and green only.
     fn draw_wave(&self, wv: &ModernWave) {
-        let Some((wave, _)) = &self.screen else { return };
+        let Some(wave) = &self.screen else { return };
         wave.bind();
         let p = &self.wave;
         unsafe {
@@ -1324,7 +1338,7 @@ impl ModernPass {
             if !crate::gl::es() {
                 gl::BindVertexArray(self.vao);
             }
-            let (pos, normal, uv) = (p.attrib("a_pos"), p.attrib("a_normal"), p.attrib("a_uv"));
+            let [pos, normal, uv] = self.wave_attribs;
             let record = (MODERN_RECORD * 4) as i32;
             gl::BindBuffer(gl::ARRAY_BUFFER, self.mesh_buf);
             gl::EnableVertexAttribArray(pos);
@@ -1365,45 +1379,42 @@ impl ModernPass {
                 self.noise.as_ptr() as _,
             );
         }
-        let Some((wave, screen)) = &self.screen else { return };
+        let Some(wave) = &self.screen else { return };
         let u = &f.post;
-        screen.bind();
-        let c = &self.composite;
-        c.use_();
-        c.i1("u_back", 0);
-        c.i1("u_wave", 1);
-        c.i1("u_noise", 2);
-        c.f2("u_screen", [w as f32, h as f32]);
-        for (i, name) in ["u_colour1", "u_colour2", "u_colour3", "u_colour4"].iter().enumerate() {
-            c.f3(name, u.colours[i]);
-        }
-        c.f1("u_exposure", u.exposure);
-        c.f1("u_white_sqr_rcp", u.white_sqr_rcp);
-        c.f1("u_threshold", u.threshold);
-        c.f1("u_gamma", u.gamma);
+        let set_composite = |c: &Program| {
+            c.i1("u_back", 0);
+            c.i1("u_wave", 1);
+            c.i1("u_noise", 2);
+            c.f2("u_screen", [w as f32, h as f32]);
+            for (i, name) in ["u_colour1", "u_colour2", "u_colour3", "u_colour4"].iter().enumerate() {
+                c.f3(name, u.colours[i]);
+            }
+            c.f1("u_exposure", u.exposure);
+            c.f1("u_white_sqr_rcp", u.white_sqr_rcp);
+            c.f1("u_threshold", u.threshold);
+            c.f1("u_gamma", u.gamma);
+        };
         bind_texture(0, self.back_target.tex);
         bind_texture(1, wave.tex);
         bind_texture(2, self.noise_tex);
-        self.full(quad);
 
         // The glare's chain holds 8 times the screen's light at most; in bytes it is kept at an
         // eighth.
         let scale = if self.float { 1.0 } else { 0.125 };
         if let Some(g) = &self.glare {
-            g.pre.bind();
+            g.pre.bind_whole();
             self.source.use_();
-            self.source.i1("u_src", 0);
+            set_composite(&self.source);
             self.source.f1("u_scale", scale);
-            bind_texture(0, screen.tex);
             self.full(quad);
             self.copy.use_();
             self.copy.i1("u_src", 0);
             self.copy.f1("u_scale", 1.0);
-            g.pyramid[0].bind();
+            g.pyramid[0].bind_whole();
             bind_texture(0, g.pre.tex);
             self.full(quad);
             for l in 1..LEVELS {
-                g.pyramid[l].bind();
+                g.pyramid[l].bind_whole();
                 bind_texture(0, g.pyramid[l - 1].tex);
                 self.full(quad);
             }
@@ -1411,18 +1422,20 @@ impl ModernPass {
             gp.use_();
             gp.i1("u_src", 0);
             unsafe { gl::Uniform3fv(gp.at("u_weights"), 8, u.gauss.as_ptr()) };
+            let reach = (1..8).rev().find(|&k| u.gauss[3 * k..3 * k + 3].iter().any(|&w| w != 0.0)).unwrap_or(0);
+            gp.f1("u_taps", reach as f32);
             for l in 0..LEVELS {
                 let t = &g.pyramid[l];
-                g.across[l].bind();
+                g.across[l].bind_whole();
                 gp.f2("u_step", [1.0 / t.w as f32, 0.0]);
                 bind_texture(0, t.tex);
                 self.full(quad);
-                g.down[l].bind();
+                g.down[l].bind_whole();
                 gp.f2("u_step", [0.0, 1.0 / t.h as f32]);
                 bind_texture(0, g.across[l].tex);
                 self.full(quad);
             }
-            g.acc.bind();
+            g.acc.bind_whole();
             let a = &self.accumulate;
             a.use_();
             for l in 0..LEVELS {
@@ -1436,19 +1449,24 @@ impl ModernPass {
         unsafe {
             gl::BindFramebuffer(gl::FRAMEBUFFER, target);
             gl::Viewport(0, 0, w, h);
+            // Drawn over whole and opaque, nothing under it shows: a clear spares the GPU reading
+            // the frame back in.
+            if alpha >= 1.0 {
+                gl::ClearColor(0.0, 0.0, 0.0, 1.0);
+                gl::Clear(gl::COLOR_BUFFER_BIT);
+            }
         }
         let d = &self.display;
         d.use_();
-        d.i1("u_screen_tex", 0);
-        d.i1("u_glare", 1);
-        d.i1("u_noise", 2);
-        d.f2("u_screen", [w as f32, h as f32]);
+        set_composite(d);
+        d.i1("u_glare", 3);
         d.f1("u_glare_weight", u.glare_weight / scale);
         d.f1("u_glare_on", if self.glare.is_some() { 1.0 } else { 0.0 });
         d.f1("u_fade", f.fade);
         d.f1("u_alpha", alpha);
-        bind_texture(0, screen.tex);
-        bind_texture(1, self.glare.as_ref().map_or(self.noise_tex, |g| g.acc.tex));
+        bind_texture(0, self.back_target.tex);
+        bind_texture(1, wave.tex);
+        bind_texture(3, self.glare.as_ref().map_or(self.noise_tex, |g| g.acc.tex));
         bind_texture(2, self.noise_tex);
         unsafe {
             if alpha < 1.0 {
@@ -1478,7 +1496,7 @@ impl ModernPass {
             }
             bind_texture(0, self.iridescent);
         }
-        for p in [&self.sparkle_quads, &self.sparkle_glare] {
+        for (p, attribs) in [&self.sparkle_quads, &self.sparkle_glare].into_iter().zip(self.sparkle_attribs) {
             p.use_();
             unsafe { gl::UniformMatrix4fv(p.at("u_mvp"), 1, gl::FALSE, s.mvp.as_ptr()) };
             p.f3("u_eye", s.eye);
@@ -1501,7 +1519,7 @@ impl ModernPass {
             p.f1("u_gamma", s.gamma);
             p.i1("u_iridescent", 0);
             let stride = (MODERN_SPARKLE_VERTEX * 4) as i32;
-            let (corner, place, turn) = (p.attrib("a_pos"), p.attrib("a_place"), p.attrib("a_turn"));
+            let [corner, place, turn] = attribs;
             unsafe {
                 gl::BindBuffer(gl::ARRAY_BUFFER, self.sparkle_buf);
                 gl::EnableVertexAttribArray(corner);

@@ -65,6 +65,7 @@ struct Moment {
     day: u32,
     hour: f64,
     seconds: f64,
+    from_black: bool,
 }
 
 /// The wall clock as the scene reads it.
@@ -114,6 +115,9 @@ pub struct ModernScene {
     fade_rate: f64,
     aspect: f64,
     frame: ModernFrame,
+    /// The backdrop's textures as they stand, and the sparkles' colours.
+    months: [Vec<u8>; 4],
+    iridescent: Vec<u8>,
 }
 
 impl ModernScene {
@@ -126,16 +130,11 @@ impl ModernScene {
         for _ in 0..240 {
             wave.update(&ws, 1.0 / 60.0, 4.0 / 3.0, false);
         }
-        let mut frame = ModernFrame {
-            mesh: vec![0.0; MODERN_VERTICES * MODERN_RECORD],
-            sparkles: vec![0.0; MODERN_SPARKLES * 4 * MODERN_SPARKLE_VERTEX],
-            iridescent: iridescent_texels(&IRIDESCENT_PALETTE),
+        let frame = ModernFrame {
             fade: 1.0,
             ..ModernFrame::default()
         };
-        for m in frame.months.iter_mut() {
-            *m = vec![0; MODERN_BACK_W * MODERN_BACK_H * 4];
-        }
+        let months = [0; 4].map(|_| vec![0; MODERN_BACK_W * MODERN_BACK_H * 4]);
         ModernScene {
             wave,
             sparkles: System::new(MODERN_SPARKLES, seed),
@@ -149,6 +148,7 @@ impl ModernScene {
                 day: 1,
                 hour: 12.0,
                 seconds: 0.0,
+                from_black: false,
             },
             serial: 0,
             ease: 0.0,
@@ -161,6 +161,8 @@ impl ModernScene {
             fade_rate: 0.0,
             aspect: 4.0 / 3.0,
             frame,
+            months,
+            iridescent: iridescent_texels(&IRIDESCENT_PALETTE),
         }
     }
 
@@ -236,6 +238,7 @@ impl ModernScene {
             day: wall.day,
             hour: if noon { 12.0 } else { wall.hour },
             seconds: TICK,
+            from_black: false,
         };
         let hand = |m: Moment, me: &mut Self| {
             me.moment = m;
@@ -248,6 +251,7 @@ impl ModernScene {
                 Moment {
                     hour: BOOT_HOUR,
                     seconds: BOOT_EASE,
+                    from_black: true,
                     ..shown
                 },
                 self,
@@ -267,7 +271,19 @@ impl ModernScene {
 
     /// The frame to draw, built from where the scene stands.
     pub fn frame(&mut self) -> &ModernFrame {
-        let f = &mut self.frame;
+        let mut f = std::mem::take(&mut self.frame);
+        self.frame_into(&mut f);
+        self.frame = f;
+        &self.frame
+    }
+
+    /// Builds the frame into `f`, a buffer handed back and forth (`ModernWorker`).
+    pub fn frame_into(&mut self, f: &mut ModernFrame) {
+        f.mesh.resize(MODERN_VERTICES * MODERN_RECORD, 0.0);
+        f.sparkles.resize(MODERN_SPARKLES * 4 * MODERN_SPARKLE_VERTEX, 0.0);
+        if f.iridescent.is_empty() {
+            f.iridescent.clone_from(&self.iridescent);
+        }
         f.mesh.copy_from_slice(&self.wave.mesh);
         let s = &self.ws;
         f.wave = ModernWave {
@@ -291,16 +307,21 @@ impl ModernScene {
             self.textures = TEXTURES.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             match &self.colour {
                 ModernColour::Months => {
-                    f.months[0] = month_texels(&DAY[want.0]);
-                    f.months[1] = month_texels(&DAY[want.1]);
-                    f.months[2] = month_texels(&NIGHT[want.0]);
-                    f.months[3] = month_texels(&NIGHT[want.1]);
+                    self.months[0] = month_texels(&DAY[want.0]);
+                    self.months[1] = month_texels(&DAY[want.1]);
+                    self.months[2] = month_texels(&NIGHT[want.0]);
+                    self.months[3] = month_texels(&NIGHT[want.1]);
                 }
                 ModernColour::Picture(p) => {
-                    for t in f.months.iter_mut() {
+                    for t in self.months.iter_mut() {
                         t.clone_from(p);
                     }
                 }
+            }
+        }
+        if f.backdrop.textures != self.textures {
+            for (to, from) in f.months.iter_mut().zip(&self.months) {
+                to.clone_from(from);
             }
         }
         f.backdrop = backdrop_uniforms(s, &m, self.ease, self.serial, self.textures);
@@ -318,7 +339,22 @@ impl ModernScene {
         }
         f.sparkle_count = n;
         f.particles = sparkle_uniforms(&self.sparkles.effective, self.aspect, self.sparkles.color_fade.value);
-        &self.frame
+    }
+
+    /// Moves the scene on by `dt` in steps of at most a thirtieth of a second, as `advance`; a
+    /// long gap (frames held back, a test's settling) is run through, not skipped.
+    pub fn advance_by(&mut self, dt: f64, wall: Wall, steps: &[usize], held: Option<usize>, aspect: f64) {
+        let mut left = dt.max(0.0);
+        let mut steps = steps;
+        loop {
+            let step = left.min(1.0 / 30.0);
+            self.advance(step, wall, steps, held, aspect);
+            steps = &[];
+            left -= step;
+            if left <= 0.0 {
+                break;
+            }
+        }
     }
 }
 
@@ -365,6 +401,7 @@ fn backdrop_uniforms(s: &WaveSettings, m: &Moment, ease: f64, serial: u64, textu
         alpha: alpha as f32,
         serial,
         textures,
+        from_black: m.from_black,
     }
 }
 
@@ -560,4 +597,123 @@ pub fn xmb_modern_picture_of(colours: &slot_gfx::BackdropColours, ground: Option
         }
     }
     out
+}
+
+enum Job {
+    Colour(ModernColour),
+    Boot,
+    Advance {
+        dt: f64,
+        wall: Wall,
+        steps: Vec<usize>,
+        aspect: f64,
+        frame: Box<ModernFrame>,
+    },
+}
+
+/// The scene on a thread of its own: each frame hands it the time and the bar's moves and takes
+/// the frame it built from the last ones, so that the scene's work runs on another core while
+/// this one draws. What is drawn trails the bar by that one frame.
+pub struct ModernWorker {
+    jobs: std::sync::mpsc::Sender<Job>,
+    done: std::sync::mpsc::Receiver<ModernFrame>,
+    latest: ModernFrame,
+    busy: bool,
+}
+
+impl ModernWorker {
+    pub fn new(mut scene: ModernScene) -> Self {
+        let (jobs, inbox) = std::sync::mpsc::channel::<Job>();
+        let (outbox, done) = std::sync::mpsc::channel();
+        let run = move || {
+            for job in inbox {
+                match job {
+                    Job::Colour(c) => scene.set_colour(c),
+                    Job::Boot => scene.boot(),
+                    Job::Advance {
+                        dt,
+                        wall,
+                        steps,
+                        aspect,
+                        mut frame,
+                    } => {
+                        scene.advance_by(dt, wall, &steps, None, aspect);
+                        scene.frame_into(&mut frame);
+                        if outbox.send(*frame).is_err() {
+                            return;
+                        }
+                    }
+                }
+            }
+        };
+        let _ = std::thread::Builder::new().name("slot-modern".into()).spawn(run);
+        ModernWorker {
+            jobs,
+            done,
+            latest: ModernFrame::default(),
+            busy: false,
+        }
+    }
+
+    /// Starts the XMB's start. The next frame waits for the scene, so that it is the start's
+    /// first and not the frame before it.
+    pub fn boot(&mut self) {
+        if self.busy {
+            if let Ok(f) = self.done.recv() {
+                self.latest = f;
+            }
+            self.busy = false;
+        }
+        let _ = self.jobs.send(Job::Boot);
+    }
+
+    pub fn set_colour(&mut self, colour: ModernColour) {
+        let _ = self.jobs.send(Job::Colour(colour));
+    }
+
+    /// Takes the frame the scene built from the last call's moves, and sets it off on this one's.
+    /// The first call waits for its frame.
+    pub fn advance(&mut self, dt: f64, wall: Wall, steps: &[usize], aspect: f64) -> &ModernFrame {
+        let mut spare = ModernFrame::default();
+        if !self.busy {
+            let first = Job::Advance {
+                dt,
+                wall,
+                steps: steps.to_vec(),
+                aspect,
+                frame: Box::default(),
+            };
+            if self.jobs.send(first).is_ok() {
+                if let Ok(f) = self.done.recv() {
+                    self.latest = f;
+                }
+            }
+            let job = Job::Advance {
+                dt: 0.0,
+                wall,
+                steps: Vec::new(),
+                aspect,
+                frame: Box::new(spare),
+            };
+            self.busy = self.jobs.send(job).is_ok();
+            return &self.latest;
+        }
+        if let Ok(f) = self.done.recv() {
+            spare = std::mem::replace(&mut self.latest, f);
+        }
+        let job = Job::Advance {
+            dt,
+            wall,
+            steps: steps.to_vec(),
+            aspect,
+            frame: Box::new(spare),
+        };
+        self.busy = self.jobs.send(job).is_ok();
+        &self.latest
+    }
+
+    /// The frame `advance` last returned.
+    pub fn frame(&self) -> &ModernFrame {
+        &self.latest
+    }
 }

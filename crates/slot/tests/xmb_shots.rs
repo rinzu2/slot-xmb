@@ -109,7 +109,8 @@ impl Soft {
     fn sync(&mut self, app: &mut App) {
         if app.xmb_modern() && app.xmb_visible() {
             let m = self.modern.get_or_insert_with(|| {
-                slot::frontend::ModernSync::new(slot_ui::xmb_modern::ModernScene::new(Some(5)), false)
+                let scene = slot_ui::xmb_modern::ModernScene::new(Some(5));
+                slot::frontend::ModernSync::new(slot_ui::xmb_modern::ModernWorker::new(scene), false)
             });
             m.drive(app, None);
         }

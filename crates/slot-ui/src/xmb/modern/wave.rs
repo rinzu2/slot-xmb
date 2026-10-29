@@ -425,16 +425,26 @@ fn transform_point(m: &[f64; 16], p: [f32; 4]) -> [f32; 4] {
 struct SampleBasis {
     pos: [f64; SAMPLES * 4],
     slope: [f64; SAMPLES * 4],
+    // In single precision, for the surface, which the handheld's cores work out twice as fast.
+    pos32: [f32; SAMPLES * 4],
+    slope32: [f32; SAMPLES * 4],
 }
 
 impl SampleBasis {
     fn new() -> Self {
-        let mut s = SampleBasis { pos: [0.0; SAMPLES * 4], slope: [0.0; SAMPLES * 4] };
+        let mut s = SampleBasis {
+            pos: [0.0; SAMPLES * 4],
+            slope: [0.0; SAMPLES * 4],
+            pos32: [0.0; SAMPLES * 4],
+            slope32: [0.0; SAMPLES * 4],
+        };
         for j in 0..SAMPLES {
             let t = (j * SPANS) as f64 / (MESH - 1) as f64;
             basis(t, &mut s.pos[4 * j..4 * j + 4]);
             basis_slope(t, &mut s.slope[4 * j..4 * j + 4]);
         }
+        s.pos32 = s.pos.map(|v| v as f32);
+        s.slope32 = s.slope.map(|v| v as f32);
         s
     }
 }
@@ -442,16 +452,19 @@ impl SampleBasis {
 /// The surface (FUN_000045c0): the bicubic B-spline over the 19 x 19 control points, rows the lines. Vertex ix of line
 /// iy sits in span (iy / 8, ix / 8); its normal is the cross product of the slope across the lines with the slope
 /// along them, per span, in clip space, with w = 0. Evaluated along the lines first, then across.
-fn evaluate_surface(sb: &SampleBasis, ctrl: &[f32], row_pos: &mut [f64], row_slope: &mut [f64], mesh: &mut [f32]) {
+fn evaluate_surface(sb: &SampleBasis, ctrl: &[f32], row_pos: &mut [f32], row_slope: &mut [f32], mesh: &mut [f32]) {
+    // In single precision: the mesh it writes is single precision, and what the double precision
+    // kept is far below a pixel.
+    let (pos, slope) = (&sb.pos32, &sb.slope32);
     for r in 0..N {
         for ix in 0..MESH {
             let span = ix >> 3;
             let wb = 4 * (ix & 7);
-            let (mut px, mut py, mut pz, mut pw, mut sx, mut sy, mut sz) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+            let (mut px, mut py, mut pz, mut pw, mut sx, mut sy, mut sz) = (0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
             for b in 0..4 {
                 let c = 4 * (N * r + span + b);
-                let (w, d) = (sb.pos[wb + b], sb.slope[wb + b]);
-                let (cx, cy, cz, cw) = (ctrl[c] as f64, ctrl[c + 1] as f64, ctrl[c + 2] as f64, ctrl[c + 3] as f64);
+                let (w, d) = (pos[wb + b], slope[wb + b]);
+                let (cx, cy, cz, cw) = (ctrl[c], ctrl[c + 1], ctrl[c + 2], ctrl[c + 3]);
                 px += w * cx;
                 py += w * cy;
                 pz += w * cz;
@@ -468,32 +481,35 @@ fn evaluate_surface(sb: &SampleBasis, ctrl: &[f32], row_pos: &mut [f64], row_slo
     for iy in 0..MESH {
         let span = iy >> 3;
         let wa = 4 * (iy & 7);
-        for ix in 0..MESH {
-            let (mut px, mut py, mut pz, mut pw) = (0.0, 0.0, 0.0, 0.0);
-            let (mut tx, mut ty, mut tz, mut sx, mut sy, mut sz) = (0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
+        let (w, d) = (&pos[wa..wa + 4], &slope[wa..wa + 4]);
+        let rows = [0, 1, 2, 3].map(|a| 4 * MESH * (span + a));
+        let out = &mut mesh[RECORD * MESH * iy..RECORD * MESH * (iy + 1)];
+        for (ix, v) in out.chunks_exact_mut(RECORD).enumerate() {
+            let (mut px, mut py, mut pz, mut pw) = (0.0f32, 0.0, 0.0, 0.0);
+            let (mut tx, mut ty, mut tz, mut sx, mut sy, mut sz) = (0.0f32, 0.0, 0.0, 0.0, 0.0, 0.0);
             for a in 0..4 {
-                let o = 4 * (MESH * (span + a) + ix);
-                let (w, d) = (sb.pos[wa + a], sb.slope[wa + a]);
-                px += w * row_pos[o];
-                py += w * row_pos[o + 1];
-                pz += w * row_pos[o + 2];
-                pw += w * row_pos[o + 3];
-                tx += d * row_pos[o];
-                ty += d * row_pos[o + 1];
-                tz += d * row_pos[o + 2];
-                sx += w * row_slope[o];
-                sy += w * row_slope[o + 1];
-                sz += w * row_slope[o + 2];
+                let o = rows[a] + 4 * ix;
+                let p = &row_pos[o..o + 4];
+                let q = &row_slope[o..o + 3];
+                px += w[a] * p[0];
+                py += w[a] * p[1];
+                pz += w[a] * p[2];
+                pw += w[a] * p[3];
+                tx += d[a] * p[0];
+                ty += d[a] * p[1];
+                tz += d[a] * p[2];
+                sx += w[a] * q[0];
+                sy += w[a] * q[1];
+                sz += w[a] * q[2];
             }
-            let v = RECORD * (MESH * iy + ix);
-            mesh[v] = px as f32;
-            mesh[v + 1] = py as f32;
-            mesh[v + 2] = pz as f32;
-            mesh[v + 3] = pw as f32;
-            mesh[v + 4] = (ty * sz - tz * sy) as f32;
-            mesh[v + 5] = (tz * sx - tx * sz) as f32;
-            mesh[v + 6] = (tx * sy - ty * sx) as f32;
-            mesh[v + 7] = 0.0;
+            v[0] = px;
+            v[1] = py;
+            v[2] = pz;
+            v[3] = pw;
+            v[4] = ty * sz - tz * sy;
+            v[5] = tz * sx - tx * sz;
+            v[6] = tx * sy - ty * sx;
+            v[7] = 0.0;
         }
     }
 }
@@ -604,8 +620,8 @@ pub struct Wave {
     lattice_ctrl: Vec<f64>,
     lattice_old: Vec<f64>,
     weights: [f64; 16],
-    row_pos: Vec<f64>,
-    row_slope: Vec<f64>,
+    row_pos: Vec<f32>,
+    row_slope: Vec<f32>,
     sample_basis: SampleBasis,
     /// 16384 records of 8 floats, as spline.elf writes them: position (clip space), then normal. Built only while the
     /// surface is built on the CPU.
