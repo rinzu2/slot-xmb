@@ -306,6 +306,37 @@ void main() {
 }
 "#;
 
+// The backdrop's 64 x 32 buffer, enlarged by a Catmull-Rom curve through its texels rather than
+// straight lines between them: the same colours at the same places, without the joins every
+// thirty-two-rows-of-the-screen a straight stretch shows where the backdrop's light curves (at the
+// top and the bottom of the screen); the composite then stretches the larger buffer.
+const SMOOTH_FRAG: &str = r#"
+uniform sampler2D u_src;
+uniform vec2 u_size;
+varying vec2 v_uv;
+vec4 weights(float t) {
+    float t2 = t * t;
+    float t3 = t2 * t;
+    return vec4(-0.5 * t3 + t2 - 0.5 * t, 1.5 * t3 - 2.5 * t2 + 1.0, -1.5 * t3 + 2.0 * t2 + 0.5 * t, 0.5 * t3 - 0.5 * t2);
+}
+vec3 at(vec2 i) {
+    return texture2D(u_src, (clamp(i, vec2(0.0), u_size - 1.0) + 0.5) / u_size).rgb;
+}
+vec3 row(vec2 i, vec4 w) {
+    return at(i + vec2(-1.0, 0.0)) * w.x + at(i) * w.y + at(i + vec2(1.0, 0.0)) * w.z + at(i + vec2(2.0, 0.0)) * w.w;
+}
+void main() {
+    vec2 p = v_uv * u_size - 0.5;
+    vec2 i = floor(p);
+    vec2 f = p - i;
+    vec4 wx = weights(f.x);
+    vec4 wy = weights(f.y);
+    vec3 c = row(i + vec2(0.0, -1.0), wx) * wy.x + row(i, wx) * wy.y + row(i + vec2(0.0, 1.0), wx) * wy.z
+        + row(i + vec2(0.0, 2.0), wx) * wy.w;
+    FRAG_COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+}
+"#;
+
 const COPY_FRAG: &str = r#"
 uniform sampler2D u_src;
 uniform float u_scale;
@@ -925,6 +956,9 @@ pub struct ModernPass {
     months: [gl::types::GLuint; 4],
     iridescent: gl::types::GLuint,
     back_target: Target,
+    /// The backdrop enlarged, which the composite reads.
+    back_smooth: Target,
+    smooth: Program,
     snapshot: Target,
     float: bool,
     glare: Option<Glare>,
@@ -1107,10 +1141,18 @@ impl ModernPass {
         if glare.is_none() {
             glare = Glare::new(false);
         }
-        let back_target = Target::new(MODERN_BACK_W as i32, MODERN_BACK_H as i32, false)
-            .ok_or(GfxError::Framebuffer(0))?;
-        let snapshot = Target::new(MODERN_BACK_W as i32, MODERN_BACK_H as i32, false)
-            .ok_or(GfxError::Framebuffer(0))?;
+        // The backdrop in half floats too, as the console keeps it, where the GPU has them.
+        let held = |w: usize, h: usize| {
+            float
+                .then(|| Target::new(w as i32, h as i32, true))
+                .flatten()
+                .or_else(|| Target::new(w as i32, h as i32, false))
+                .ok_or(GfxError::Framebuffer(0))
+        };
+        let back_target = held(MODERN_BACK_W, MODERN_BACK_H)?;
+        let snapshot = held(MODERN_BACK_W, MODERN_BACK_H)?;
+        let back_smooth = held(MODERN_BACK_W * 4, MODERN_BACK_H * 4)?;
+        let smooth = Program::new(FULL_VERT, SMOOTH_FRAG, &["u_src", "u_size"])?;
         unsafe { gl::BindFramebuffer(gl::FRAMEBUFFER, 0) };
         eprintln!(
             "slot: modern background ready, glare in {}",
@@ -1147,6 +1189,8 @@ impl ModernPass {
             months,
             iridescent,
             back_target,
+            back_smooth,
+            smooth,
             snapshot,
             float,
             glare,
@@ -1312,6 +1356,12 @@ impl ModernPass {
         }
         self.full(quad);
         unsafe { gl::Disable(gl::BLEND) };
+        self.back_smooth.bind_whole();
+        self.smooth.use_();
+        self.smooth.i1("u_src", 0);
+        self.smooth.f2("u_size", [MODERN_BACK_W as f32, MODERN_BACK_H as f32]);
+        bind_texture(0, self.back_target.tex);
+        self.full(quad);
     }
 
     /// The wave adds its light into its own buffer, red and green only.
@@ -1394,7 +1444,7 @@ impl ModernPass {
             c.f1("u_threshold", u.threshold);
             c.f1("u_gamma", u.gamma);
         };
-        bind_texture(0, self.back_target.tex);
+        bind_texture(0, self.back_smooth.tex);
         bind_texture(1, wave.tex);
         bind_texture(2, self.noise_tex);
 
@@ -1464,7 +1514,7 @@ impl ModernPass {
         d.f1("u_glare_on", if self.glare.is_some() { 1.0 } else { 0.0 });
         d.f1("u_fade", f.fade);
         d.f1("u_alpha", alpha);
-        bind_texture(0, self.back_target.tex);
+        bind_texture(0, self.back_smooth.tex);
         bind_texture(1, wave.tex);
         bind_texture(3, self.glare.as_ref().map_or(self.noise_tex, |g| g.acc.tex));
         bind_texture(2, self.noise_tex);
