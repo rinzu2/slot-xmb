@@ -311,6 +311,12 @@ void main() {
 // thirty-two-rows-of-the-screen a straight stretch shows where the backdrop's light curves (at the
 // top and the bottom of the screen); the composite then stretches the larger buffer.
 const SMOOTH_FRAG: &str = r#"
+uniform float u_dither;
+// Half a byte's step of noise, where the buffer written is in bytes: what the blur and the
+// stretch after it average away comes back as the precision a byte cannot hold.
+float dither() {
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+}
 uniform sampler2D u_src;
 uniform vec2 u_size;
 varying vec2 v_uv;
@@ -333,16 +339,22 @@ void main() {
     vec4 wy = weights(f.y);
     vec3 c = row(i + vec2(0.0, -1.0), wx) * wy.x + row(i, wx) * wy.y + row(i + vec2(0.0, 1.0), wx) * wy.z
         + row(i + vec2(0.0, 2.0), wx) * wy.w;
-    FRAG_COLOR = vec4(clamp(c, 0.0, 1.0), 1.0);
+    FRAG_COLOR = vec4(clamp(c, 0.0, 1.0) + dither() * u_dither, 1.0);
 }
 "#;
 
 const COPY_FRAG: &str = r#"
 uniform sampler2D u_src;
+uniform float u_dither;
+// Half a byte's step of noise, where the buffer written is in bytes: what the blur and the
+// stretch after it average away comes back as the precision a byte cannot hold.
+float dither() {
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+}
 uniform float u_scale;
 varying vec2 v_uv;
 void main() {
-    FRAG_COLOR = texture2D(u_src, v_uv) * u_scale;
+    FRAG_COLOR = texture2D(u_src, v_uv) * u_scale + dither() * u_dither;
 }
 "#;
 
@@ -386,16 +398,28 @@ vec4 composite_at(vec2 pix) {
 
 // GlareSourcePre.fpo: the screen times its mask, times 8 (over `u_scale`'s range in bytes).
 const SOURCE_FRAG: &str = r#"
+uniform float u_dither;
+// Half a byte's step of noise, where the buffer written is in bytes: what the blur and the
+// stretch after it average away comes back as the precision a byte cannot hold.
+float dither() {
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+}
 uniform float u_scale;
 varying vec2 v_uv;
 void main() {
     vec4 s = composite_at(v_uv * u_screen);
-    FRAG_COLOR = vec4(s.rgb * s.a * 8.0 * u_scale, 0.0);
+    FRAG_COLOR = vec4(s.rgb * s.a * 8.0 * u_scale + dither() * u_dither, 0.0);
 }
 "#;
 
 // Gaussian.fpo: the texel and up to seven either side along one axis, each channel its weights.
 const GAUSSIAN_FRAG: &str = r#"
+uniform float u_dither;
+// Half a byte's step of noise, where the buffer written is in bytes: what the blur and the
+// stretch after it average away comes back as the precision a byte cannot hold.
+float dither() {
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+}
 uniform sampler2D u_src;
 uniform vec2 u_step;
 uniform vec3 u_weights[8];
@@ -409,7 +433,7 @@ void main() {
         vec2 d = u_step * float(k);
         sum += (texture2D(u_src, v_uv + d).rgb + texture2D(u_src, v_uv - d).rgb) * u_weights[k];
     }
-    FRAG_COLOR = vec4(sum, 0.0);
+    FRAG_COLOR = vec4(sum + dither() * u_dither, 0.0);
 }
 "#;
 
@@ -421,6 +445,12 @@ uniform sampler2D u_level2;
 uniform sampler2D u_level3;
 uniform sampler2D u_level4;
 uniform sampler2D u_level5;
+uniform float u_dither;
+// Half a byte's step of noise, where the buffer written is in bytes: what the blur and the
+// stretch after it average away comes back as the precision a byte cannot hold.
+float dither() {
+    return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) - 0.5;
+}
 uniform float u_weight[6];
 varying vec2 v_uv;
 void main() {
@@ -430,7 +460,7 @@ void main() {
     sum += texture2D(u_level3, v_uv).rgb * u_weight[3];
     sum += texture2D(u_level4, v_uv).rgb * u_weight[4];
     sum += texture2D(u_level5, v_uv).rgb * u_weight[5];
-    FRAG_COLOR = vec4(sum, 0.0);
+    FRAG_COLOR = vec4(sum + dither() * u_dither, 0.0);
 }
 "#;
 
@@ -705,6 +735,7 @@ fn texture(
     let (internal, kind) = match (float, crate::gl::es()) {
         (false, true) => (gl::RGBA as i32, gl::UNSIGNED_BYTE),
         (false, false) => (gl::RGBA8 as i32, gl::UNSIGNED_BYTE),
+        (true, true) if es3() => (gl::RGBA16F as i32, gl::HALF_FLOAT),
         (true, true) => (gl::RGBA as i32, HALF_FLOAT_OES),
         (true, false) => (gl::RGBA16F as i32, gl::HALF_FLOAT),
     };
@@ -734,18 +765,38 @@ fn texture(
 
 /// Whether the GPU renders to half floats and filters them.
 fn half_floats() -> bool {
+    // For tests: the GPU as one without half floats would draw it.
+    if std::env::var_os("SLOT_MODERN_BYTES").is_some() {
+        return false;
+    }
     if !crate::gl::es() {
         return true;
     }
     let ext = unsafe { gl::GetString(gl::EXTENSIONS) };
+    let es3 = es3();
     if ext.is_null() {
         return false;
     }
     let ext = unsafe { std::ffi::CStr::from_ptr(ext as *const std::ffi::c_char) }.to_string_lossy();
     let has = |name: &str| ext.split_ascii_whitespace().any(|e| e == name);
-    has("GL_OES_texture_half_float")
-        && has("GL_OES_texture_half_float_linear")
-        && (has("GL_EXT_color_buffer_half_float") || has("GL_EXT_color_buffer_float"))
+    let renders = has("GL_EXT_color_buffer_half_float") || has("GL_EXT_color_buffer_float");
+    // OpenGL ES 3 has half floats and filters them itself; ES 2 needs both from extensions.
+    match es3 {
+        true => renders,
+        false => renders && has("GL_OES_texture_half_float") && has("GL_OES_texture_half_float_linear"),
+    }
+}
+
+/// Whether the context is OpenGL ES 3 or later, as the handheld's GPU gives even for a context
+/// asked for as ES 2: half floats are then made the ES 3 way.
+fn es3() -> bool {
+    let v = unsafe { gl::GetString(gl::VERSION) };
+    if v.is_null() {
+        return false;
+    }
+    let v = unsafe { std::ffi::CStr::from_ptr(v as *const std::ffi::c_char) }.to_string_lossy();
+    let rest = v.trim_start_matches("OpenGL ES ");
+    rest.len() < v.len() && rest.chars().next().and_then(|c| c.to_digit(10)).is_some_and(|d| d >= 3)
 }
 
 struct Program {
@@ -959,6 +1010,8 @@ pub struct ModernPass {
     /// The backdrop enlarged, which the composite reads.
     back_smooth: Target,
     smooth: Program,
+    /// Whether the backdrop's buffers are half floats.
+    back_float: bool,
     snapshot: Target,
     float: bool,
     glare: Option<Glare>,
@@ -1024,17 +1077,17 @@ impl ModernPass {
             ],
         )?;
         let music = Program::new(FULL_VERT, MUSIC_FRAG, &["u_day_time", "u_alpha"])?;
-        let copy = Program::new(FULL_VERT, COPY_FRAG, &["u_src", "u_scale"])?;
+        let copy = Program::new(FULL_VERT, COPY_FRAG, &["u_src", "u_scale", "u_dither"])?;
         let source = Program::new(
             FULL_VERT,
             &format!("{COMPOSITE_FN}{SOURCE_FRAG}"),
-            &[&COMPOSITE_UNIFORMS[..], &["u_scale"]].concat(),
+            &[&COMPOSITE_UNIFORMS[..], &["u_scale", "u_dither"]].concat(),
         )?;
-        let gaussian = Program::new(FULL_VERT, GAUSSIAN_FRAG, &["u_src", "u_step", "u_weights", "u_taps"])?;
+        let gaussian = Program::new(FULL_VERT, GAUSSIAN_FRAG, &["u_src", "u_step", "u_weights", "u_taps", "u_dither"])?;
         let accumulate = Program::new(
             FULL_VERT,
             ACCUMULATE_FRAG,
-            &["u_level0", "u_level1", "u_level2", "u_level3", "u_level4", "u_level5", "u_weight"],
+            &["u_level0", "u_level1", "u_level2", "u_level3", "u_level4", "u_level5", "u_weight", "u_dither"],
         )?;
         let display = Program::new(
             FULL_VERT,
@@ -1142,20 +1195,22 @@ impl ModernPass {
             glare = Glare::new(false);
         }
         // The backdrop in half floats too, as the console keeps it, where the GPU has them.
-        let held = |w: usize, h: usize| {
-            float
-                .then(|| Target::new(w as i32, h as i32, true))
-                .flatten()
-                .or_else(|| Target::new(w as i32, h as i32, false))
-                .ok_or(GfxError::Framebuffer(0))
-        };
+        let back_float = float && Target::new(MODERN_BACK_W as i32, MODERN_BACK_H as i32, true).is_some();
+        let held = |w: usize, h: usize| Target::new(w as i32, h as i32, back_float).ok_or(GfxError::Framebuffer(0));
         let back_target = held(MODERN_BACK_W, MODERN_BACK_H)?;
         let snapshot = held(MODERN_BACK_W, MODERN_BACK_H)?;
         let back_smooth = held(MODERN_BACK_W * 4, MODERN_BACK_H * 4)?;
-        let smooth = Program::new(FULL_VERT, SMOOTH_FRAG, &["u_src", "u_size"])?;
+        let smooth = Program::new(FULL_VERT, SMOOTH_FRAG, &["u_src", "u_size", "u_dither"])?;
         unsafe { gl::BindFramebuffer(gl::FRAMEBUFFER, 0) };
+        let version = unsafe { gl::GetString(gl::VERSION) };
+        let version = match version.is_null() {
+            true => String::new(),
+            false => unsafe { std::ffi::CStr::from_ptr(version as *const std::ffi::c_char) }
+                .to_string_lossy()
+                .into_owned(),
+        };
         eprintln!(
-            "slot: modern background ready, glare in {}",
+            "slot: modern background ready on {version}, glare in {}",
             match (&glare, float) {
                 (None, _) => "nothing",
                 (Some(_), true) => "half floats",
@@ -1191,6 +1246,7 @@ impl ModernPass {
             back_target,
             back_smooth,
             smooth,
+            back_float,
             snapshot,
             float,
             glare,
@@ -1326,6 +1382,7 @@ impl ModernPass {
                 self.copy.use_();
                 self.copy.i1("u_src", 0);
                 self.copy.f1("u_scale", 1.0);
+                self.copy.f1("u_dither", 0.0);
                 bind_texture(0, self.back_target.tex);
                 self.full(quad);
             }
@@ -1334,6 +1391,7 @@ impl ModernPass {
         self.copy.use_();
         self.copy.i1("u_src", 0);
         self.copy.f1("u_scale", 1.0);
+        self.copy.f1("u_dither", 0.0);
         bind_texture(0, self.snapshot.tex);
         self.full(quad);
         let p = if b.shader == 1 { &self.music } else { &self.back };
@@ -1360,6 +1418,7 @@ impl ModernPass {
         self.smooth.use_();
         self.smooth.i1("u_src", 0);
         self.smooth.f2("u_size", [MODERN_BACK_W as f32, MODERN_BACK_H as f32]);
+        self.smooth.f1("u_dither", if self.back_float { 0.0 } else { 1.0 / 255.0 });
         bind_texture(0, self.back_target.tex);
         self.full(quad);
     }
@@ -1450,16 +1509,21 @@ impl ModernPass {
 
         // The glare's chain holds 8 times the screen's light at most; in bytes it is kept at an
         // eighth.
-        let scale = if self.float { 1.0 } else { 0.125 };
+        // In bytes the light is kept as it is, dithered: the glare's source almost never reaches
+        // 1, and an eighth of it, the headroom the console's 8 could ask for, bands.
+        let scale = 1.0;
+        let dither = if self.float { 0.0 } else { 1.0 / 255.0 };
         if let Some(g) = &self.glare {
             g.pre.bind_whole();
             self.source.use_();
             set_composite(&self.source);
             self.source.f1("u_scale", scale);
+            self.source.f1("u_dither", dither);
             self.full(quad);
             self.copy.use_();
             self.copy.i1("u_src", 0);
             self.copy.f1("u_scale", 1.0);
+            self.copy.f1("u_dither", dither);
             g.pyramid[0].bind_whole();
             bind_texture(0, g.pre.tex);
             self.full(quad);
@@ -1474,6 +1538,7 @@ impl ModernPass {
             unsafe { gl::Uniform3fv(gp.at("u_weights"), 8, u.gauss.as_ptr()) };
             let reach = (1..8).rev().find(|&k| u.gauss[3 * k..3 * k + 3].iter().any(|&w| w != 0.0)).unwrap_or(0);
             gp.f1("u_taps", reach as f32);
+            gp.f1("u_dither", dither);
             for l in 0..LEVELS {
                 let t = &g.pyramid[l];
                 g.across[l].bind_whole();
@@ -1493,6 +1558,7 @@ impl ModernPass {
                 bind_texture(l as u32, g.down[l].tex);
             }
             unsafe { gl::Uniform1fv(a.at("u_weight"), LEVELS as i32, u.levels.as_ptr()) };
+            a.f1("u_dither", dither);
             self.full(quad);
         }
 
