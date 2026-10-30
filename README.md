@@ -90,7 +90,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 Download the latest release from this fork's [releases page](../../releases/latest). It's the complete slot card layout, with the same cores, scripts and folders, plus the XMB build of `System/slot`.
 
 - **New install:** follow the [slot guide](https://slot-cfw.fyi), using this fork's release zip in place of slot's own.
-- **Updating, or switching from slot v1.9.0:** copy `System/slot` from the zip over the one on your SD card. Your games, saves and settings stay as they are.
+- **Updating, or switching from slot:** copy the whole zip over your SD card, letting it replace files. Your games, saves and settings stay as they are. (From v1.5 the mGBA core and the card's folders changed too, not just `System/slot`.)
 
 The boot picture is written to the device the first time the new build runs. It shows from the following boot onwards.
 
@@ -135,7 +135,7 @@ XMB_SHOTS=shots cargo test --release -p slot \
 
 # Credits
 
-- **[slot](https://github.com/BrandonKowalski/slot) by [Brandon Kowalski](https://github.com/BrandonKowalski).** This fork is built on slot v1.9.0 and wouldn't exist without it. Read the [slot guide](https://slot-cfw.fyi) and the [upstream changelog](https://github.com/BrandonKowalski/slot/blob/main/CHANGELOG.md), and if you enjoy slot, you can [support Brandon on Ko-fi](https://ko-fi.com/kwallbmoc).
+- **[slot](https://github.com/BrandonKowalski/slot) by [Brandon Kowalski](https://github.com/BrandonKowalski).** This fork is built on slot v1.12.0 and wouldn't exist without it. Read the [slot guide](https://slot-cfw.fyi) and the [upstream changelog](https://github.com/BrandonKowalski/slot/blob/main/CHANGELOG.md), and if you enjoy slot, you can [support Brandon on Ko-fi](https://ko-fi.com/kwallbmoc).
 - [BaseOS](https://github.com/pvaibhav/BaseOS), the system slot runs on.
 - **Modern** is ported from [PlayStation-3-XMB](https://github.com/faquino/PlayStation-3-XMB) by faquino, a fork of Mart's [linkev/PlayStation-3-XMB](https://github.com/linkev/PlayStation-3-XMB), and from [Nagare](https://github.com/bungholesurfers/Nagare), its Rust port. faquino worked out the wave, the sparkles and the backdrop from the console's firmware in RPCS3. Their code is MIT licensed; the notice is in [`crates/slot-ui/src/xmb/modern/LICENSE-MIT`](crates/slot-ui/src/xmb/modern/LICENSE-MIT).
 - Fonts: [Saira](https://github.com/Omnibus-Type/Saira) and [Montserrat](https://github.com/JulietaUla/Montserrat), both under the SIL Open Font License.
@@ -145,4 +145,4 @@ XMB_SHOTS=shots cargo test --release -p slot \
 
 GPL-3.0, the same as upstream. See [LICENSE](LICENSE). The Modern background's ported code keeps its MIT licence ([`LICENSE-MIT`](crates/slot-ui/src/xmb/modern/LICENSE-MIT)).
 
-slot is the work of Brandon Kowalski. This fork modifies slot v1.9.0 (commit `20703ed`): the changes, made in October 2026, add the `xmb` feature and its art, fonts, animation and settings. The full history of both is in this repository's commits.
+slot is the work of Brandon Kowalski. This fork modifies slot (first v1.9.0, commit `20703ed`, now merged up to v1.12.0, commit `c19ccbc`): the changes, made in October 2026, add the `xmb` feature and its art, fonts, animation and settings. The full history of both is in this repository's commits.
