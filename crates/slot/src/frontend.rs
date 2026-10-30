@@ -160,6 +160,10 @@ pub struct ModernSync {
     look: Option<crate::app::ModernLook>,
     place: Option<(i32, i32)>,
     timing: (f64, f64, u32),
+    /// Whether the bar has been off the screen since the last frame: a game played, say.
+    asleep: bool,
+    /// The time the scene was last moved on by.
+    step: f64,
 }
 
 impl ModernSync {
@@ -171,7 +175,20 @@ impl ModernSync {
             look: None,
             place: None,
             timing: (0.0, 0.0, 0),
+            asleep: false,
+            step: 0.0,
         }
+    }
+
+    /// The time, in seconds, the scene was last moved on by.
+    pub fn last_step(&self) -> f64 {
+        self.step
+    }
+
+    /// The bar has left the screen. The scene is not run while it is away; when it comes back it
+    /// carries on from where it stood, at once, rather than running through the time it missed.
+    pub fn sleep(&mut self) {
+        self.asleep = true;
     }
 }
 
@@ -186,6 +203,12 @@ impl ModernSync {
     /// start under the boot picture, the bar's moves stirring the sparkles, and the clock.
     pub fn drive(&mut self, app: &App, grounds: Option<&[slot_ui::CartFace]>) -> &slot_gfx::ModernFrame {
         use slot_ui::xmb_modern::{xmb_modern_picture, xmb_modern_picture_of, ModernColour, Wall};
+        if self.asleep {
+            self.asleep = false;
+            self.scene.resync();
+            self.time = None;
+            self.place = None;
+        }
         let look = app.xmb_modern_look();
         if self.look != Some(look) {
             self.look = Some(look);
@@ -217,6 +240,7 @@ impl ModernSync {
         // the clock is not.
         let dt = if (0.0..30.0).contains(&dt) { dt as f64 } else { 1.0 / 60.0 };
         self.time = Some(now);
+        self.step = dt;
         let place = app.xmb_place();
         let mut steps = Vec::new();
         if let Some((col, row)) = self.place {
@@ -238,10 +262,7 @@ impl ModernSync {
 fn sync_modern(app: &App, compositor: &mut Compositor, xs: &mut XmbSync) {
     let m = xs
         .modern
-        .get_or_insert_with(|| {
-            let scene = slot_ui::xmb_modern::ModernScene::new(None);
-            ModernSync::new(slot_ui::xmb_modern::ModernWorker::new(scene), false)
-        });
+        .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None), false));
     let began = std::time::Instant::now();
     let frame = m.drive(app, xs.grounds.as_deref());
     let waited = began.elapsed();
@@ -331,8 +352,19 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
     }
     if app.xmb_visible() && app.xmb_modern() {
         sync_modern(app, compositor, xs);
+    } else if app.xmb_modern() {
+        // Chosen but off the screen (a game resumed at start-up, say): everything it needs is
+        // made now, so that pausing shows it at once, and the scene rests until then.
+        compositor.prepare_modern();
+        xs.modern
+            .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None), true))
+            .sleep();
+    } else if let Some(m) = &mut xs.modern {
+        m.sleep();
     }
-    if app.xmb_visible() {
+    // Modern draws its own wave; the bar's curves are only made for it while it cannot.
+    let modern_drawn = app.xmb_wave_style() == slot_gfx::STYLE_MODERN && compositor.modern_works();
+    if app.xmb_visible() && !(modern_drawn && xs.art.curves.is_some()) {
         slot_ui::xmb_curves_at(
             app.xmb_wave_style(),
             app.xmb_time(),

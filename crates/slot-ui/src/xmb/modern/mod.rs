@@ -28,7 +28,7 @@ use slot_gfx::{
 
 use months::{month_texels, DAY, NIGHT};
 use particles::{SimOptions, System, LIFE_MAX, LIFE_MIN, OUT_STRIDE};
-use scene::{Scene, BOOT_EASE, BOOT_HOUR, TICK};
+use scene::{Scene, BOOT_EASE, TICK};
 use settings::{ParticleSettings, WaveSettings};
 use wave::{Wave, CAMERA};
 
@@ -57,6 +57,9 @@ pub enum ModernColour {
     /// the console's Theme Settings colour, it holds the scene at noon.
     Picture(Vec<u8>),
 }
+
+/// How long the wave takes to come up out of the dark as the XMB's start begins.
+const BOOT_RISE: f64 = 2.8;
 
 /// A moment handed to the backdrop: the month (0 to 11), its day, the hour, and how long it eases in.
 #[derive(Clone, Copy, Debug)]
@@ -105,7 +108,14 @@ pub struct ModernScene {
     serial: u64,
     ease: f64,
     tick: Option<i64>,
+    /// The clock's minute the backdrop was last handed: it is handed a new moment once a minute,
+    /// so that between times it stands still and is not drawn again.
+    minute: Option<(usize, u32, i64)>,
     boot_handed: bool,
+    /// When the XMB's start began, for the wave's rise out of the dark.
+    boot_at: Option<f64>,
+    /// Whether `wave.mesh` holds a surface `frame_into` has not yet taken.
+    mesh_fresh: bool,
     /// The textures for the backdrop and a count of their changes.
     textures: u64,
     months_for: Option<(usize, usize)>,
@@ -153,7 +163,10 @@ impl ModernScene {
             serial: 0,
             ease: 0.0,
             tick: None,
+            minute: None,
             boot_handed: false,
+            boot_at: None,
+            mesh_fresh: true,
             textures: 0,
             months_for: None,
             fade: 1.0,
@@ -172,6 +185,7 @@ impl ModernScene {
         self.scene.boot(self.time);
         self.wave.reset();
         self.boot_handed = false;
+        self.boot_at = Some(self.time);
     }
 
     pub fn booting(&self) -> bool {
@@ -209,6 +223,7 @@ impl ModernScene {
         self.scene.apply(self.time, hour, &mut self.ps, &mut self.ws);
         self.hand_backdrop(wall, noon);
         self.wave.update(&self.ws, dt, aspect, true);
+        self.mesh_fresh = true;
         self.sparkles.step_input(steps, held);
         let opts = SimOptions {
             video_height: VIDEO_LINES,
@@ -229,27 +244,32 @@ impl ModernScene {
         }
     }
 
-    /// The moment the backdrop is handed: the clock's, a second at a time while nothing holds the
-    /// clock, or ten in the morning as the XMB's start begins.
+    /// The moment the backdrop is handed: the clock's, a minute at a time while nothing holds the
+    /// clock, or the clock's own as the XMB's start begins, eased in out of black. The hour moves
+    /// the backdrop by far less than a shade in a minute, so it waits for the minute to turn; and
+    /// a long ease, the start's, runs to its end before the clock's next moment takes over.
     fn hand_backdrop(&mut self, wall: Wall, noon: bool) {
         let tick = self.time.floor() as i64;
+        let hour = if noon { 12.0 } else { wall.hour };
         let shown = Moment {
             month: wall.month,
             day: wall.day,
-            hour: if noon { 12.0 } else { wall.hour },
+            hour,
             seconds: TICK,
             from_black: false,
         };
+        let minute = (wall.month, wall.day, (hour * 60.0).floor() as i64);
         let hand = |m: Moment, me: &mut Self| {
             me.moment = m;
             me.serial = MOMENTS.fetch_add(1, std::sync::atomic::Ordering::Relaxed) + 1;
             me.ease = 0.0;
+            me.minute = Some(minute);
         };
+        let easing = self.moment.seconds > TICK && self.ease < self.moment.seconds;
         if self.scene.booting() && !self.boot_handed {
             self.boot_handed = true;
             hand(
                 Moment {
-                    hour: BOOT_HOUR,
                     seconds: BOOT_EASE,
                     from_black: true,
                     ..shown
@@ -258,7 +278,11 @@ impl ModernScene {
             );
         } else if self.tick.is_none() {
             hand(Moment { seconds: 0.0, ..shown }, self);
-        } else if Some(tick) != self.tick && !self.scene.clock_held(self.time) {
+        } else if Some(tick) != self.tick
+            && self.minute != Some(minute)
+            && !easing
+            && !self.scene.clock_held(self.time)
+        {
             hand(shown, self);
         }
         self.tick = Some(tick);
@@ -284,7 +308,14 @@ impl ModernScene {
         if f.iridescent.is_empty() {
             f.iridescent.clone_from(&self.iridescent);
         }
-        f.mesh.copy_from_slice(&self.wave.mesh);
+        // The surface just built is handed over whole rather than copied: the next one is built
+        // into the buffer the frame gives back.
+        if self.mesh_fresh && f.mesh.len() == self.wave.mesh.len() {
+            std::mem::swap(&mut f.mesh, &mut self.wave.mesh);
+            self.mesh_fresh = false;
+        } else {
+            f.mesh.copy_from_slice(&self.wave.mesh);
+        }
         let s = &self.ws;
         f.wave = ModernWave {
             mipmap_bias: s.mipmap_bias as f32,
@@ -294,7 +325,15 @@ impl ModernScene {
             thinness: s.thinness as f32,
         };
         f.post = post_uniforms(s, 1.0);
-        f.fade = self.fade as f32;
+        // As the XMB's start begins, the wave and its sparkles rise slowly out of the dark.
+        let rise = self.boot_at.map_or(1.0, |at| {
+            let x = ((self.time - at) / BOOT_RISE).clamp(0.0, 1.0);
+            x * x * x * (x * (6.0 * x - 15.0) + 10.0)
+        });
+        if rise >= 1.0 {
+            self.boot_at = None;
+        }
+        f.fade = (self.fade * rise) as f32;
         // The backdrop.
         let m = self.moment;
         let want = match &self.colour {
@@ -622,10 +661,20 @@ pub struct ModernWorker {
 }
 
 impl ModernWorker {
-    pub fn new(mut scene: ModernScene) -> Self {
+    pub fn new(scene: ModernScene) -> Self {
+        Self::spawn(move || scene)
+    }
+
+    /// A worker whose scene is made on its own thread, so that making it costs the caller nothing.
+    pub fn fresh(seed: Option<i32>) -> Self {
+        Self::spawn(move || ModernScene::new(seed))
+    }
+
+    fn spawn(make: impl FnOnce() -> ModernScene + Send + 'static) -> Self {
         let (jobs, inbox) = std::sync::mpsc::channel::<Job>();
         let (outbox, done) = std::sync::mpsc::channel();
         let run = move || {
+            let mut scene = make();
             for job in inbox {
                 match job {
                     Job::Colour(c) => scene.set_colour(c),
@@ -669,6 +718,17 @@ impl ModernWorker {
 
     pub fn set_colour(&mut self, colour: ModernColour) {
         let _ = self.jobs.send(Job::Colour(colour));
+    }
+
+    /// After the scene has been left alone (the bar off the screen), the frame still on its way
+    /// was built for a moment long gone: it is let go, and the next frame is built afresh.
+    pub fn resync(&mut self) {
+        if self.busy {
+            if let Ok(f) = self.done.recv() {
+                self.latest = f;
+            }
+            self.busy = false;
+        }
     }
 
     /// Takes the frame the scene built from the last call's moves, and sets it off on this one's.

@@ -237,10 +237,14 @@ impl App {
     /// settling. The waves move slowly enough then to be drawn at a fraction of the rate.
     pub fn xmb_calm(&self) -> bool {
         const QUIET_MS: Millis = 1500;
-        XMB && matches!(
-            self.phase,
-            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::XmbClock { .. }
-        ) && self.now().saturating_sub(self.xmb_touched) > QUIET_MS
+        // A paused game's menu rests too, unless the game runs on behind it for a link.
+        let paused = matches!(self.phase, Phase::Playing { .. }) && self.xmb_visible() && !self.link_active();
+        XMB && (paused
+            || matches!(
+                self.phase,
+                Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::XmbClock { .. }
+            ))
+            && self.now().saturating_sub(self.xmb_touched) > QUIET_MS
             && (self.xmb_col - self.xmb_target()).abs() < 1e-3
             && (self.xmb_nest - self.xmb_nest_target()).abs() < 1e-3
             && !self.hud.visible(self.now())

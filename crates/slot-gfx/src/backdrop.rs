@@ -99,11 +99,14 @@ uniform sampler2D u_curves;
 uniform vec2 u_size;
 uniform float u_style;
 uniform float u_alpha;
-uniform vec3 u_c[15];
 uniform vec4 u_e[3];
 uniform vec4 u_shape;
 uniform sampler2D u_ground;
 uniform float u_has_ground;
+// The five colours across the screen (`side`: the top, Original's ground and its sheet's two,
+// Classic's ground), worked out on the CPU for each column once when the colours change rather
+// than for every pixel of every frame: each 16 bits a channel, the high bytes a row above the low.
+uniform sampler2D u_cols;
 
 vec4 texel(float row) {
     return texture2D(u_curves, vec2(v_uv.x, (row + 0.5) / 8.0));
@@ -113,17 +116,10 @@ float dec(vec2 hl) {
     return (hl.x * 65280.0 + hl.y * 255.0) / 65535.0 * 2.0 - 0.5;
 }
 
-// Left to middle and middle to right are straight runs, eased into each other across the
-// middle (and into the held colour at the far left) so no seam shows where they meet.
-float floor_soft(float x, float a) {
-    float d = x - a;
-    return a + 0.5 * (d + sqrt(d * d + 0.01));
-}
-
-vec3 side(vec3 l, vec3 m, vec3 r, float u) {
-    vec3 a = mix(l, m, floor_soft((u - 0.234) / 0.349, -0.3));
-    vec3 b = mix(m, r, clamp((u - 0.583) / 0.396, -1.0, 1.06));
-    return clamp(mix(a, b, smoothstep(0.433, 0.733, u)), 0.0, 1.0);
+vec3 side(float part) {
+    vec3 hi = texture2D(u_cols, vec2(v_uv.x, (2.0 * part + 0.5) / 10.0)).rgb;
+    vec3 lo = texture2D(u_cols, vec2(v_uv.x, (2.0 * part + 1.5) / 10.0)).rgb;
+    return (hi * 65280.0 + lo * 255.0) / 65535.0;
 }
 
 // Lengths below are in pixels of a 480-line screen; `k` scales them to this one.
@@ -139,7 +135,7 @@ void main() {
     // Only a band about the middle shows, `u_shape.x` either side of it, its edges soft.
     float inside = 1.0 - smoothstep(u_shape.x - u_shape.w, u_shape.x + u_shape.w, abs(v - 0.5));
     float py = v * u_size.y;
-    vec3 top = side(u_c[0], u_c[1], u_c[2], u);
+    vec3 top = side(0.0);
     // The handheld's own picture for the colour, when it is on the card, a touch brighter on its
     // screen than in the file: the ground under both styles' waves.
     vec3 picture = vec3(0.0);
@@ -152,13 +148,13 @@ void main() {
         vec4 e = texel(0.0);
         float d1 = py - dec(e.rg) * u_size.y;
         float d2 = py - dec(e.ba) * u_size.y;
-        vec3 ground = mix(top, side(u_c[3], u_c[4], u_c[5], u), clamp((v - 0.11) / 0.44, 0.0, 1.0));
+        vec3 ground = mix(top, side(1.0), clamp((v - 0.11) / 0.44, 0.0, 1.0));
         if (u_has_ground > 0.5) {
             ground = picture;
         }
         plain = ground;
         float em = min(dec(e.rg), dec(e.ba));
-        vec3 sheet = mix(side(u_c[6], u_c[7], u_c[8], u), side(u_c[9], u_c[10], u_c[11], u),
+        vec3 sheet = mix(side(2.0), side(3.0),
             clamp((v - em - 0.055) / max(0.92 - em, 0.05), 0.0, 1.0));
         // Two sheets: the main wave in front, solid, and the veil behind it, faint, whichever
         // of the two is higher at this point. `u_e[2].x` is how much the veil shows.
@@ -189,7 +185,7 @@ void main() {
             col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, u_e[2].z);
         }
     } else {
-        col = mix(top, side(u_c[12], u_c[13], u_c[14], u), smoothstep(0.11, 0.97, v));
+        col = mix(top, side(4.0), smoothstep(0.11, 0.97, v));
         if (u_has_ground > 0.5) {
             col = picture;
         }
@@ -342,10 +338,37 @@ pub(crate) struct BackdropPass {
     u_size: gl::types::GLint,
     u_style: gl::types::GLint,
     u_alpha: gl::types::GLint,
-    u_c: gl::types::GLint,
     u_e: gl::types::GLint,
     u_shape: gl::types::GLint,
     u_has_ground: gl::types::GLint,
+    /// The colours across the screen, a column a texel (`side_table`), and what they were made for.
+    cols: gl::types::GLuint,
+    cols_for: Option<(BackdropColours, usize)>,
+}
+
+/// Rows of `side_table`: the five colours across the screen, each a row of high bytes and one of low.
+const SIDE_ROWS: usize = 10;
+
+/// The five colours across the screen (`side`) at the middle of each of `w` columns, as the
+/// backdrop's program reads them: 16 bits a channel, the high bytes a row above the low.
+fn side_table(colours: &BackdropColours, w: usize) -> Vec<u8> {
+    let c = colours.map(|rgb| rgb.map(|v| v as f32 / 255.0));
+    let mut out = vec![0u8; w * SIDE_ROWS * 4];
+    for part in 0..5 {
+        for x in 0..w {
+            let u = (x as f32 + 0.5) / w as f32;
+            let rgb = side(&c, part, u);
+            let (hi, lo) = ((2 * part * w + x) * 4, ((2 * part + 1) * w + x) * 4);
+            for (i, v) in rgb.iter().enumerate() {
+                let q = (v.clamp(0.0, 1.0) * 65535.0).round() as u32;
+                out[hi + i] = (q >> 8) as u8;
+                out[lo + i] = (q & 0xff) as u8;
+            }
+            out[hi + 3] = 255;
+            out[lo + 3] = 255;
+        }
+    }
+    out
 }
 
 impl BackdropPass {
@@ -355,6 +378,21 @@ impl BackdropPass {
             gl::UseProgram(prog);
             gl::Uniform1i(crate::gl::uniform_location(prog, "u_curves"), 0);
             gl::Uniform1i(crate::gl::uniform_location(prog, "u_ground"), 1);
+            gl::Uniform1i(crate::gl::uniform_location(prog, "u_cols"), 2);
+        }
+        let mut cols = 0;
+        unsafe {
+            gl::GenTextures(1, &mut cols);
+            gl::BindTexture(gl::TEXTURE_2D, cols);
+            for (k, v) in [
+                (gl::TEXTURE_MIN_FILTER, gl::NEAREST),
+                (gl::TEXTURE_MAG_FILTER, gl::NEAREST),
+                (gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE),
+                (gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE),
+            ] {
+                gl::TexParameteri(gl::TEXTURE_2D, k, v as i32);
+            }
+            gl::BindTexture(gl::TEXTURE_2D, 0);
         }
         Ok(BackdropPass {
             prog,
@@ -363,22 +401,44 @@ impl BackdropPass {
             u_size: crate::gl::uniform_location(prog, "u_size"),
             u_style: crate::gl::uniform_location(prog, "u_style"),
             u_alpha: crate::gl::uniform_location(prog, "u_alpha"),
-            u_c: crate::gl::uniform_location(prog, "u_c"),
             u_e: crate::gl::uniform_location(prog, "u_e"),
             u_shape: crate::gl::uniform_location(prog, "u_shape"),
             u_has_ground: crate::gl::uniform_location(prog, "u_has_ground"),
+            cols,
+            cols_for: None,
         })
     }
 
     pub fn draw(
-        &self,
+        &mut self,
         b: &Backdrop,
         curves: gl::types::GLuint,
         ground: Option<gl::types::GLuint>,
         canvas: Canvas,
         quad: &Quad,
     ) {
-        let flat: Vec<f32> = b.colours.iter().flatten().map(|v| *v as f32 / 255.0).collect();
+        // A column of the table a column of the screen.
+        let w = (canvas.w.round() as usize).clamp(1, 4096);
+        if self.cols_for != Some((b.colours, w)) {
+            self.cols_for = Some((b.colours, w));
+            let table = side_table(&b.colours, w);
+            unsafe {
+                gl::ActiveTexture(gl::TEXTURE2);
+                gl::BindTexture(gl::TEXTURE_2D, self.cols);
+                gl::PixelStorei(gl::UNPACK_ALIGNMENT, 1);
+                gl::TexImage2D(
+                    gl::TEXTURE_2D,
+                    0,
+                    gl::RGBA as i32,
+                    w as i32,
+                    SIDE_ROWS as i32,
+                    0,
+                    gl::RGBA,
+                    gl::UNSIGNED_BYTE,
+                    table.as_ptr() as _,
+                );
+            }
+        }
         unsafe {
             if b.alpha < 1.0 {
                 gl::Enable(gl::BLEND);
@@ -390,6 +450,8 @@ impl BackdropPass {
                 gl::BindTexture(gl::TEXTURE_2D, ground);
             }
             gl::Uniform1f(self.u_has_ground, if ground.is_some() { 1.0 } else { 0.0 });
+            gl::ActiveTexture(gl::TEXTURE2);
+            gl::BindTexture(gl::TEXTURE_2D, self.cols);
             gl::ActiveTexture(gl::TEXTURE0);
             gl::BindTexture(gl::TEXTURE_2D, curves);
             gl::Uniform4f(self.u_rect, 0.0, 0.0, canvas.w, canvas.h);
@@ -397,7 +459,6 @@ impl BackdropPass {
             gl::Uniform2f(self.u_size, canvas.w, canvas.h);
             gl::Uniform1f(self.u_style, b.style as f32);
             gl::Uniform1f(self.u_alpha, b.alpha);
-            gl::Uniform3fv(self.u_c, 15, flat.as_ptr());
             let edges: Vec<f32> = b.edges.iter().flatten().copied().collect();
             gl::Uniform4fv(self.u_e, 3, edges.as_ptr());
             gl::Uniform4f(self.u_shape, b.shape[0], b.shape[1], b.shape[2], b.shape[3]);
@@ -409,7 +470,10 @@ impl BackdropPass {
 
 impl Drop for BackdropPass {
     fn drop(&mut self) {
-        unsafe { gl::DeleteProgram(self.prog) };
+        unsafe {
+            gl::DeleteProgram(self.prog);
+            gl::DeleteTextures(1, &self.cols);
+        }
     }
 }
 

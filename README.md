@@ -83,7 +83,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 
 **Power use**
 
-- When nothing is moving on the home screen, the bar draws at 20 frames per second instead of 60, so the device runs cooler.
+- When nothing is moving on the home screen or a paused game's menu, the bar draws at 20 frames per second instead of 60 (30 with Modern, whose sparkles keep drifting), so the device runs cooler. The waves' colours are worked out once per column rather than for every pixel, and Modern's backdrop is only redrawn when it changes.
 
 # Install
 

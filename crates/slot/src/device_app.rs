@@ -458,9 +458,12 @@ impl BootIntro {
             );
             compositor.set_modern(frame);
         }
-        slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
-        let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
-        compositor.update_texture(self.curves, w, h, &self.buf);
+        // Modern draws its own wave: the bar's curves are only made for it while it cannot.
+        if self.style != slot_gfx::STYLE_MODERN || !compositor.modern_works() {
+            slot_ui::xmb_curves_at(self.style, t, Some(t - slot_ui::XMB_INTRO_WAVES), &mut self.buf);
+            let (w, h) = (slot_gfx::BACKDROP_COLS as u32, slot_gfx::BACKDROP_ROWS as u32);
+            compositor.update_texture(self.curves, w, h, &self.buf);
+        }
         let canvas = slot_gfx::Canvas::of(self.window);
         self.draws.clear();
         slot_ui::XmbIntro {

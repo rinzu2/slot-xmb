@@ -113,6 +113,8 @@ impl Soft {
                 slot::frontend::ModernSync::new(slot_ui::xmb_modern::ModernWorker::new(scene), false)
             });
             m.drive(app, None);
+        } else if let Some(m) = &mut self.modern {
+            m.sleep();
         }
         let mut art = slot_ui::XmbArt::default();
         for icon in slot_ui::XmbIcon::ALL {
@@ -1051,9 +1053,28 @@ fn modern_goes_dark_behind_a_paused_game() {
     a.set_game_ready(true);
     let mut soft = Soft::new();
     soft.faces(&mut a);
-    soft.settle(&mut a, 60);
+    // The scene the frontend makes ahead, as it is when a game comes back at start-up.
+    let mut m = slot::frontend::ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(Some(5)), true);
+    m.drive(&a, None);
+    soft.modern = Some(m);
+    // Twenty seconds of play, the bar off the screen.
+    soft.settle(&mut a, 600);
     a.apply(Action::QuickMenu);
     assert_eq!(a.xmb_modern_look(), slot::app::ModernLook::Dark);
+    // The pause shows at once: the scene carries on from where it stood rather than running
+    // through the time the game was played.
+    let mut longest = 0.0f64;
+    for _ in 0..30 {
+        a.update(1.0 / 30.0);
+        soft.frame(&mut a);
+        longest = longest.max(soft.modern.as_ref().map_or(0.0, |m| m.last_step()));
+    }
+    assert!(a.xmb_visible());
+    assert!(longest < 0.1, "the scene ran through {longest} s at once");
     soft.settle(&mut a, 60);
     soft.shot(&mut a, "49_modern_paused");
+    // Left alone, the paused menu rests at the bar's slower pace.
+    soft.settle(&mut a, 60);
+    assert!(a.xmb_calm(), "a paused game's menu, left alone, is calm");
 }
+

@@ -73,10 +73,11 @@ pub fn xmb_intro_shape(t: f32) -> Option<[f32; 4]> {
     if t < XMB_INTRO_BLOOM {
         return None;
     }
-    // The picture opens out from the lines to the top and bottom of the screen.
-    let open = ease(ramp(t, XMB_INTRO_BLOOM + 0.02, 0.18));
-    let reach = lerp(0.02, 0.62, open);
-    let soft = lerp(0.04, 0.1, open);
+    // The picture opens out from the lines to the top and bottom of the screen, its edges
+    // softening as they go so that the colour comes into the top and bottom as a gradient.
+    let open = ease(ramp(t, XMB_INTRO_BLOOM + 0.02, 0.34));
+    let reach = lerp(0.02, 0.72, open);
+    let soft = lerp(0.04, 0.2, open);
     let flat = 1.0 - ease(ramp(t, 2.5, 0.1));
     let bright = lerp(0.2, 0.38, open) + (1.0 - 0.38) * ease(ramp(t, 2.58, 0.52));
     Some([reach, bright, flat, soft])

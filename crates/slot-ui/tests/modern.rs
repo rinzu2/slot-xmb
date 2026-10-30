@@ -157,3 +157,4 @@ fn bench_the_scene() {
         (t2 - t1).as_secs_f64() * 1000.0 / n as f64
     );
 }
+

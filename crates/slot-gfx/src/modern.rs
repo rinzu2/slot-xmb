@@ -1023,6 +1023,8 @@ pub struct ModernPass {
     frame: ModernFrame,
     months_at: u64,
     serial: Option<u64>,
+    /// The backdrop as it stands in its buffers, once its moment has eased all the way in.
+    back_steady: Option<(u64, u64, [u32; 6])>,
     iridescent_set: bool,
 }
 
@@ -1256,6 +1258,7 @@ impl ModernPass {
             frame: ModernFrame::default(),
             months_at: 0,
             serial: None,
+            back_steady: None,
             iridescent_set: false,
         })
     }
@@ -1331,6 +1334,13 @@ impl ModernPass {
         self.frame.fade = f.fade;
     }
 
+    /// Makes the buffers a screen of `size` needs, ahead of the first frame.
+    pub(crate) fn prepare(&mut self, size: (u32, u32)) {
+        if size.0 > 0 && size.1 > 0 {
+            self.screen_targets(size.0 as i32, size.1 as i32);
+        }
+    }
+
     fn screen_targets(&mut self, w: i32, h: i32) -> bool {
         if self.screen.as_ref().is_some_and(|s| s.w == w && s.h == h) {
             return true;
@@ -1372,6 +1382,18 @@ impl ModernPass {
     /// The backdrop, into its 64 x 32 buffer: a new moment starts an ease from a copy of the
     /// buffer as it stands, and every frame draws that copy and the program over it by its ease.
     fn draw_backdrop(&mut self, b: &ModernBackdrop, quad: &crate::quad::Quad) {
+        // Once a moment has eased all the way in, the backdrop stands still until the next one:
+        // what its buffers hold is what drawing it again would give.
+        let key = (
+            b.serial,
+            self.months_at,
+            [b.day_time, b.night_time, b.month_time, b.night_brightness, b.night_day_blend, b.shader as f32]
+                .map(f32::to_bits),
+        );
+        if b.alpha >= 1.0 && self.back_steady == Some(key) {
+            return;
+        }
+        self.back_steady = (b.alpha >= 1.0).then_some(key);
         if self.serial != Some(b.serial) {
             let first = self.serial.is_none();
             self.serial = Some(b.serial);

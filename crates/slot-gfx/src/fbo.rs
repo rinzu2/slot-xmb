@@ -190,11 +190,15 @@ impl Compositor {
         self.sprites.draw(&items[from..], &self.quad);
     }
 
-    /// Takes the Modern background's next frame, for the backdrop of `STYLE_MODERN` that follows.
-    pub fn set_modern(&mut self, frame: &ModernFrame) {
+    /// Makes the Modern background's programs and buffers ahead of its first frame, so that the
+    /// frame it is first shown on (a game paused, say) does not wait for them.
+    pub fn prepare_modern(&mut self) {
         if self.modern.is_none() && !self.modern_failed {
             match ModernPass::new() {
-                Ok(m) => self.modern = Some(m),
+                Ok(mut m) => {
+                    m.prepare((self.size.0, self.size.1));
+                    self.modern = Some(m);
+                }
                 Err(e) => {
                     eprintln!("slot: modern background: {e}");
                     self.modern_failed = true;
@@ -205,6 +209,16 @@ impl Compositor {
                 gl::Viewport(0, 0, self.size.0 as i32, self.size.1 as i32);
             }
         }
+    }
+
+    /// Whether the Modern background can be drawn: made, or not yet tried.
+    pub fn modern_works(&self) -> bool {
+        !self.modern_failed
+    }
+
+    /// Takes the Modern background's next frame, for the backdrop of `STYLE_MODERN` that follows.
+    pub fn set_modern(&mut self, frame: &ModernFrame) {
+        self.prepare_modern();
         if let Some(m) = &mut self.modern {
             m.set_frame(frame);
         }
