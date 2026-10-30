@@ -208,7 +208,7 @@ pub fn run() {
     let mut drawn = false;
     frontend.drive_emulator();
     let mut pacer = Pacer::new();
-    let (mut frames, mut missed, mut early) = (0u32, 0u32, 0u32);
+    let (mut frames, mut missed, mut early, mut stale) = (0u32, 0u32, 0u32, 0u32);
     let mut last_frame: Option<Instant> = None;
     loop {
         pacer.wait();
@@ -238,7 +238,7 @@ pub fn run() {
             std::thread::sleep(CALM_POLL);
             continue;
         }
-        frontend.step_emulator(pacer.period, STEP_TIMEOUT);
+        let late = frontend.step_emulator(pacer.period, STEP_TIMEOUT);
         frontend.render(&mut compositor, window);
         last_frame = Some(Instant::now());
         let swap = Instant::now();
@@ -255,13 +255,14 @@ pub fn run() {
             frames += 1;
             missed += u32::from(dropped);
             early += u32::from(swap_took > pacer.period / 2);
+            stale += u32::from(late);
             if frames == 600 {
                 eprintln!(
-                    "slot: pace: 600 frames, {missed} missed a latch, {early} drawn early, work {:.1} ms, period {:.2} ms",
+                    "slot: pace: 600 frames, {missed} missed a latch, {early} drawn early, {stale} stale, work {:.1} ms, period {:.2} ms",
                     pacer.work.as_secs_f64() * 1e3,
                     pacer.period.as_secs_f64() * 1e3
                 );
-                (frames, missed, early) = (0, 0, 0);
+                (frames, missed, early, stale) = (0, 0, 0, 0);
             }
         }
         if !drawn {
@@ -327,7 +328,7 @@ struct BootIntro {
     clock: f32,
     /// Where it was when the Modern scene last moved on.
     modern_at: f32,
-    utc_offset_min: i32,
+    zone: slot_store::Zone,
 }
 
 impl BootIntro {
@@ -348,7 +349,7 @@ impl BootIntro {
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
-        let wall = now + i64::from(state.utc_offset_min) * 60;
+        let wall = state.zone.local(now);
         let colour = slot_ui::xmb_colour_index(state.xmb_colour, wall);
         let style = match state.xmb_wave {
             1 => slot_gfx::STYLE_CLASSIC,
@@ -399,7 +400,7 @@ impl BootIntro {
             last: None,
             clock: 0.0,
             modern_at: 0.0,
-            utc_offset_min: i32::from(state.utc_offset_min),
+            zone: state.zone,
         })
     }
 
@@ -441,11 +442,11 @@ impl BootIntro {
                 scene.boot();
                 *booted = true;
             }
-            let wall = std::time::SystemTime::now()
+            let utc = std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .map(|d| d.as_secs_f64())
-                .unwrap_or(0.0)
-                + self.utc_offset_min as f64 * 60.0;
+                .unwrap_or(0.0);
+            let wall = self.zone.local(utc as i64) as f64 + utc.fract();
             let (w, h) = self.window;
             let dt = (t - self.modern_at) as f64;
             self.modern_at = t;

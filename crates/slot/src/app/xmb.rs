@@ -5,7 +5,7 @@ use std::cell::RefCell;
 
 use super::*;
 use slot_power::Charge;
-use slot_ui::Field;
+use slot_ui::XmbClockField as Field;
 use slot_ui::{
     Xmb, XmbCat, XmbEntry, XmbIcon, XmbItem, XmbList, XmbPicker, XmbRow, XmbSize, XmbSizes,
     XmbText,
@@ -95,7 +95,7 @@ impl App {
     fn xmb_in_settings(&self) -> bool {
         matches!(
             self.phase,
-            Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. }
+            Phase::QuickMenu { .. } | Phase::About | Phase::XmbClock { .. }
         )
     }
 
@@ -113,7 +113,7 @@ impl App {
     /// Left and right move along the fields as they read on screen.
     pub(super) fn xmb_clock_move(&mut self, by: i32) {
         let order = self.xmb_clock_fields();
-        let Phase::SetClock { picker, .. } = &mut self.phase else {
+        let Phase::XmbClock { picker, .. } = &mut self.phase else {
             return;
         };
         let at = order.iter().position(|f| *f == picker.cursor()).unwrap_or(0) as i32;
@@ -121,7 +121,7 @@ impl App {
         picker.field(order[to]);
     }
 
-    fn xmb_clock_parts(&self, picker: &ClockPicker, t: &Texts) -> (Vec<Option<XmbText>>, usize) {
+    fn xmb_clock_parts(&self, picker: &slot_ui::XmbClockPicker, t: &Texts) -> (Vec<Option<XmbText>>, usize) {
         let mut parts = Vec::new();
         let mut at = 0;
         let mut push = |text: String, field: Option<Field>, parts: &mut Vec<Option<XmbText>>| {
@@ -144,7 +144,7 @@ impl App {
         }
         parts.push(None);
         let h = picker.hour();
-        let shown = match self.state.xmb_clock24 {
+        let shown = match self.state.clock_24h {
             true => h,
             false => (h + 11) % 12 + 1,
         };
@@ -153,7 +153,7 @@ impl App {
         push(format!("{:02}", picker.minute()), Some(Field::Minute), &mut parts);
         push(":".to_string(), None, &mut parts);
         push(format!("{:02}", self.wall_secs().rem_euclid(60)), None, &mut parts);
-        if !self.state.xmb_clock24 {
+        if !self.state.clock_24h {
             parts.push(None);
             push(if h < 12 { "AM" } else { "PM" }.to_string(), None, &mut parts);
         }
@@ -173,7 +173,7 @@ impl App {
         let deep = match (&self.phase, self.in_game_menu) {
             (Phase::Playing { .. }, Some(row)) => !QuickRow::PLAY.contains(&row),
             (Phase::QuickMenu { row }, _) => !QuickRow::MAIN.contains(row),
-            (Phase::About, _) | (Phase::SetClock { .. }, _) => true,
+            (Phase::About, _) | (Phase::XmbClock { .. }, _) => true,
             _ => false,
         };
         if deep {
@@ -239,7 +239,7 @@ impl App {
         const QUIET_MS: Millis = 1500;
         XMB && matches!(
             self.phase,
-            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. }
+            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::XmbClock { .. }
         ) && self.now().saturating_sub(self.xmb_touched) > QUIET_MS
             && (self.xmb_col - self.xmb_target()).abs() < 1e-3
             && (self.xmb_nest - self.xmb_nest_target()).abs() < 1e-3
@@ -276,7 +276,7 @@ impl App {
     }
 
     fn xmb_clock_now(&self) -> String {
-        slot_ui::xmb_clock_text(self.wall_secs(), self.state.xmb_date_format, self.state.xmb_clock24)
+        slot_ui::xmb_clock_text(self.wall_secs(), self.state.xmb_date_format, self.state.clock_24h)
     }
 
     /// Seconds for the waves and the glow, wrapped every ten hours to keep f32 precise.
@@ -291,7 +291,7 @@ impl App {
             return false;
         }
         match &self.phase {
-            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::SetClock { .. } => true,
+            Phase::Shelf | Phase::QuickMenu { .. } | Phase::About | Phase::XmbClock { .. } => true,
             Phase::Inserting { resumed, .. } => !resumed,
             Phase::Ejecting { .. } => !self.shows_game() && self.screen <= 0.0,
             Phase::Playing { .. } => self.in_game_menu_shown().is_some() && self.screen >= 1.0,
@@ -347,15 +347,15 @@ impl App {
             QuickRow::XmbSetClock => Some(slot_ui::xmb_date_time_text(
                 self.wall_secs(),
                 self.state.xmb_date_format,
-                self.state.xmb_clock24,
+                self.state.clock_24h,
             )),
             QuickRow::XmbDateFormat => Some(
                 slot_ui::XMB_DATE_FORMATS[usize::from(self.state.xmb_date_format.min(2))].to_string(),
             ),
             QuickRow::XmbTimeFormat => {
-                Some(slot_ui::XMB_TIME_FORMATS[usize::from(self.state.xmb_clock24)].to_string())
+                Some(slot_ui::XMB_TIME_FORMATS[usize::from(self.state.clock_24h)].to_string())
             }
-            QuickRow::XmbTimeZone => Some(zone_text(self.state.utc_offset_min)),
+            QuickRow::XmbTimeZone => Some(self.state.zone.name().to_string()),
             QuickRow::XmbBattery => Some(on_off(self.state.xmb_battery_pct)),
             QuickRow::XmbPause => Some(on_off(self.state.xmb_pause_dark)),
             // The handheld shows no value beside its colour; the strip shows the swatches.
@@ -367,7 +367,7 @@ impl App {
                 }
                 .to_string(),
             ),
-            QuickRow::DateTime => Some(slot_ui::date_time_text(self.wall_secs())),
+            QuickRow::DateTime => Some(slot_ui::date_time_text(self.wall_secs(), self.state.clock_24h)),
             QuickRow::Wallpaper => Some(self.resolved_wallpaper().label()),
             QuickRow::GbPalette | QuickRow::Palette => Some(self.gb_colors_label().to_string()),
             QuickRow::GbaBezel => bezel(Platform::Gba),
@@ -414,15 +414,19 @@ impl App {
                 return texts(&slot_ui::XMB_DATE_FORMATS, self.state.xmb_date_format.into())
             }
             QuickRow::XmbTimeFormat => {
-                return texts(&slot_ui::XMB_TIME_FORMATS, self.state.xmb_clock24.into())
+                return texts(&slot_ui::XMB_TIME_FORMATS, self.state.clock_24h.into())
             }
             QuickRow::XmbBattery => return texts(&["Off", "On"], self.state.xmb_battery_pct.into()),
             QuickRow::XmbPause => return texts(&["Off", "On"], self.state.xmb_pause_dark.into()),
             QuickRow::XmbTimeZone => {
-                let (lo, hi) = (slot_store::UTC_OFFSET_MIN, slot_store::UTC_OFFSET_MAX);
-                let names: Vec<String> = (lo..=hi).step_by(30).map(zone_text).collect();
+                // The cities slot's own clock offers, each with how far it is from UTC now.
+                let utc = self.wall_secs() - self.state.zone.offset_min(self.wall_secs()) * 60;
+                let names: Vec<String> = slot_store::Zone::ALL
+                    .iter()
+                    .map(|z| format!("{} ({})", z.name(), zone_text(z.offset_min(utc))))
+                    .collect();
                 let names: Vec<&str> = names.iter().map(String::as_str).collect();
-                let at = ((self.state.utc_offset_min - lo) / 30) as usize;
+                let at = slot_store::Zone::ALL.iter().position(|z| *z == self.state.zone).unwrap_or(0);
                 return texts(&names, at);
             }
             QuickRow::XmbWallpaper => {
@@ -461,7 +465,23 @@ impl App {
                     l.extend(levels(1));
                     l
                 }
-                QuickRow::FastForward => vec![V::Speed2, V::Speed3, V::Speed4, V::Speed6],
+                QuickRow::Saturation | QuickRow::Contrast => {
+                    let mut l = vec![V::Off];
+                    l.extend(levels(1));
+                    l
+                }
+                QuickRow::GbaScale => self.scale_choices(Platform::Gba).iter().map(|&c| scale_value(c)).collect(),
+                QuickRow::GbScale => self.scale_choices(Platform::Gb).iter().map(|&c| scale_value(c)).collect(),
+                QuickRow::GbcScale => self.scale_choices(Platform::Gbc).iter().map(|&c| scale_value(c)).collect(),
+                QuickRow::GbStretch => self.stretch_choices(Platform::Gb).iter().map(|&c| stretch_value(c)).collect(),
+                QuickRow::GbcStretch => {
+                    self.stretch_choices(Platform::Gbc).iter().map(|&c| stretch_value(c)).collect()
+                }
+                QuickRow::Blending => Blending::choices(self.core).iter().map(|&b| blending_value(b)).collect(),
+                QuickRow::GbaBlending | QuickRow::GbcBlending | QuickRow::GbBlending => {
+                    Blending::MGBA.iter().map(|&b| blending_value(b)).collect()
+                }
+                QuickRow::FastForward => vec![V::Speed1_5, V::Speed2, V::Speed3, V::Speed4, V::Speed6],
                 QuickRow::WallpaperTint => vec![V::Off, V::Low, V::Medium, V::High],
                 QuickRow::LidOff => V::LID_OFF.to_vec(),
                 QuickRow::Theme => vec![V::Dark, V::Light],
@@ -732,7 +752,7 @@ impl App {
                 scene.list = list;
                 scene.picker = picker;
             }
-            Phase::SetClock { picker, .. } => {
+            Phase::XmbClock { picker, .. } => {
                 let hidden = self.hidden_rows();
                 let row = QuickRow::XmbSetClock;
                 let (rows, list, _) = self.xmb_menu_parts(row, &QuickRow::MAIN, &hidden, false, t);
@@ -768,7 +788,7 @@ impl App {
         let (rows, list, picker) = self.xmb_menu_parts(row, &QuickRow::PLAY, &hidden, true, t);
         let cats = vec![XmbCat {
             icon: match self.playing_platform() {
-                Platform::Gba => XmbIcon::Gba,
+                Platform::Gba | Platform::Gbav => XmbIcon::Gba,
                 Platform::Gbc => XmbIcon::Gbc,
                 Platform::Gb => XmbIcon::Gb,
             },
@@ -1117,7 +1137,7 @@ impl App {
 }
 
 /// A zone as an offset from UTC: "UTC+9", "UTC-3:30".
-fn zone_text(offset_min: i16) -> String {
+fn zone_text(offset_min: i64) -> String {
     let sign = if offset_min < 0 { '-' } else { '+' };
     let off = offset_min.unsigned_abs();
     match off % 60 {
@@ -1234,7 +1254,10 @@ impl App {
             self.xmb_options,
             self.in_game_menu,
             self.xmb_about,
-            self.picker().map(|p| (p.text(), p.cursor())),
+            match &self.phase {
+                Phase::XmbClock { picker, .. } => Some((picker.secs(), picker.cursor())),
+                _ => None,
+            },
             self.state.xmb_colour,
         )
     }

@@ -38,6 +38,7 @@ pub enum QuickRow {
     Screenshots,
     Settings,
     ExitGame,
+    UndoReset,
     PlayScreen,
     PlayGameplay,
     Shader,
@@ -81,7 +82,11 @@ pub enum QuickRow {
     ScShaderNext,
     ScShaderBack,
     ScFastForward,
+    ScFastForwardToggle,
     ScRewind,
+    ScSunlightUp,
+    ScSunlightDown,
+    ScReset,
     LidOff,
     Controls,
     ControlsShelf,
@@ -90,11 +95,28 @@ pub enum QuickRow {
     ScreenGeneral,
     Brightness,
     BlueLight,
+    Saturation,
+    Contrast,
     PlayBrightness,
     PlayBlueLight,
+    PlaySaturation,
+    PlayContrast,
     AutoLoad,
     UndoSave,
     UndoLoad,
+    GbaScale,
+    GbScale,
+    GbStretch,
+    GbcScale,
+    GbcStretch,
+    Scale,
+    Stretch,
+    GbaBlending,
+    GbcBlending,
+    GbBlending,
+    Blending,
+    Guide,
+    ScGuide,
     XmbTheme,
     XmbWave,
     XmbColour,
@@ -110,7 +132,7 @@ pub enum QuickRow {
 }
 
 impl QuickRow {
-    pub const ALL: [QuickRow; 96] = [
+    pub const ALL: [QuickRow; 118] = [
         QuickRow::FastForward,
         QuickRow::FastForwardSound,
         QuickRow::Screen,
@@ -138,6 +160,7 @@ impl QuickRow {
         QuickRow::Screenshots,
         QuickRow::Settings,
         QuickRow::ExitGame,
+        QuickRow::UndoReset,
         QuickRow::PlayScreen,
         QuickRow::PlayGameplay,
         QuickRow::Shader,
@@ -181,7 +204,11 @@ impl QuickRow {
         QuickRow::ScShaderNext,
         QuickRow::ScShaderBack,
         QuickRow::ScFastForward,
+        QuickRow::ScFastForwardToggle,
         QuickRow::ScRewind,
+        QuickRow::ScSunlightUp,
+        QuickRow::ScSunlightDown,
+        QuickRow::ScReset,
         QuickRow::LidOff,
         QuickRow::Controls,
         QuickRow::ControlsShelf,
@@ -190,11 +217,28 @@ impl QuickRow {
         QuickRow::ScreenGeneral,
         QuickRow::Brightness,
         QuickRow::BlueLight,
+        QuickRow::Saturation,
+        QuickRow::Contrast,
         QuickRow::PlayBrightness,
         QuickRow::PlayBlueLight,
+        QuickRow::PlaySaturation,
+        QuickRow::PlayContrast,
         QuickRow::AutoLoad,
         QuickRow::UndoSave,
         QuickRow::UndoLoad,
+        QuickRow::GbaScale,
+        QuickRow::GbScale,
+        QuickRow::GbStretch,
+        QuickRow::GbcScale,
+        QuickRow::GbcStretch,
+        QuickRow::Scale,
+        QuickRow::Stretch,
+        QuickRow::GbaBlending,
+        QuickRow::GbcBlending,
+        QuickRow::GbBlending,
+        QuickRow::Blending,
+        QuickRow::Guide,
+        QuickRow::ScGuide,
         QuickRow::XmbTheme,
         QuickRow::XmbWave,
         QuickRow::XmbColour,
@@ -274,21 +318,26 @@ impl QuickRow {
         QuickRow::GameTurboB,
     ];
 
-    pub const SHORTCUTS: [QuickRow; 14] = [
+    pub const SHORTCUTS: [QuickRow; 19] = [
         QuickRow::ScSave,
         QuickRow::ScLoad,
+        QuickRow::ScReset,
+        QuickRow::ScRewind,
+        QuickRow::ScFastForward,
+        QuickRow::ScFastForwardToggle,
         QuickRow::ScScreenshot,
-        QuickRow::ScBrightUp,
+        QuickRow::ScGuide,
         QuickRow::ScBrightDown,
+        QuickRow::ScBrightUp,
         QuickRow::ScBlueDown,
         QuickRow::ScBlueUp,
         QuickRow::ScColour,
         QuickRow::ScPaletteBack,
         QuickRow::ScPaletteNext,
-        QuickRow::ScShaderNext,
         QuickRow::ScShaderBack,
-        QuickRow::ScFastForward,
-        QuickRow::ScRewind,
+        QuickRow::ScShaderNext,
+        QuickRow::ScSunlightDown,
+        QuickRow::ScSunlightUp,
     ];
 
     pub const SCREEN: [QuickRow; 4] = [
@@ -298,25 +347,38 @@ impl QuickRow {
         QuickRow::ScreenGb,
     ];
 
-    pub const SCREEN_GENERAL: [QuickRow; 2] = [QuickRow::Brightness, QuickRow::BlueLight];
+    pub const SCREEN_GENERAL: [QuickRow; 4] = [
+        QuickRow::Brightness,
+        QuickRow::BlueLight,
+        QuickRow::Saturation,
+        QuickRow::Contrast,
+    ];
 
-    pub const SCREEN_GBA: [QuickRow; 3] = [
+    pub const SCREEN_GBA: [QuickRow; 5] = [
         QuickRow::GbaShader,
         QuickRow::GbaColourCorrection,
+        QuickRow::GbaBlending,
         QuickRow::GbaBezel,
+        QuickRow::GbaScale,
     ];
 
-    pub const SCREEN_GBC: [QuickRow; 3] = [
+    pub const SCREEN_GBC: [QuickRow; 6] = [
         QuickRow::GbcShader,
         QuickRow::GbcColourCorrection,
+        QuickRow::GbcBlending,
         QuickRow::GbcBezel,
+        QuickRow::GbcScale,
+        QuickRow::GbcStretch,
     ];
 
-    pub const SCREEN_GB: [QuickRow; 4] = [
+    pub const SCREEN_GB: [QuickRow; 7] = [
         QuickRow::GbShader,
         QuickRow::GbColourCorrection,
+        QuickRow::GbBlending,
         QuickRow::GbPalette,
         QuickRow::GbBezel,
+        QuickRow::GbScale,
+        QuickRow::GbStretch,
     ];
 
     pub const GAME: [QuickRow; 8] = [
@@ -330,12 +392,14 @@ impl QuickRow {
         QuickRow::EjectSave,
     ];
 
-    pub const PLAY: [QuickRow; 7] = [
+    pub const PLAY: [QuickRow; 9] = [
         QuickRow::Resume,
         QuickRow::UndoSave,
         QuickRow::UndoLoad,
+        QuickRow::UndoReset,
         QuickRow::States,
         QuickRow::Screenshots,
+        QuickRow::Guide,
         QuickRow::Settings,
         QuickRow::ExitGame,
     ];
@@ -346,13 +410,18 @@ impl QuickRow {
         QuickRow::PlayControls,
     ];
 
-    pub const PLAY_SCREEN: [QuickRow; 6] = [
+    pub const PLAY_SCREEN: [QuickRow; 11] = [
         QuickRow::Shader,
         QuickRow::Bezel,
+        QuickRow::Scale,
+        QuickRow::Stretch,
         QuickRow::Palette,
         QuickRow::ColourCorrection,
+        QuickRow::Blending,
         QuickRow::PlayBrightness,
         QuickRow::PlayBlueLight,
+        QuickRow::PlaySaturation,
+        QuickRow::PlayContrast,
     ];
 
     pub fn index(self) -> usize {
@@ -365,18 +434,32 @@ impl QuickRow {
             | QuickRow::ScreenGba
             | QuickRow::ScreenGbc
             | QuickRow::ScreenGb => &QuickRow::SCREEN,
-            QuickRow::Brightness | QuickRow::BlueLight => &QuickRow::SCREEN_GENERAL,
-            QuickRow::PlayBrightness | QuickRow::PlayBlueLight => &QuickRow::PLAY_SCREEN,
-            QuickRow::GbaShader | QuickRow::GbaColourCorrection | QuickRow::GbaBezel => {
-                &QuickRow::SCREEN_GBA
-            }
-            QuickRow::GbcShader | QuickRow::GbcColourCorrection | QuickRow::GbcBezel => {
-                &QuickRow::SCREEN_GBC
-            }
+            QuickRow::Brightness
+            | QuickRow::BlueLight
+            | QuickRow::Saturation
+            | QuickRow::Contrast => &QuickRow::SCREEN_GENERAL,
+            QuickRow::PlayBrightness
+            | QuickRow::PlayBlueLight
+            | QuickRow::PlaySaturation
+            | QuickRow::PlayContrast => &QuickRow::PLAY_SCREEN,
+            QuickRow::GbaShader
+            | QuickRow::GbaColourCorrection
+            | QuickRow::GbaBlending
+            | QuickRow::GbaBezel
+            | QuickRow::GbaScale => &QuickRow::SCREEN_GBA,
+            QuickRow::GbcShader
+            | QuickRow::GbcColourCorrection
+            | QuickRow::GbcBlending
+            | QuickRow::GbcBezel
+            | QuickRow::GbcScale
+            | QuickRow::GbcStretch => &QuickRow::SCREEN_GBC,
             QuickRow::GbShader
             | QuickRow::GbColourCorrection
+            | QuickRow::GbBlending
             | QuickRow::GbPalette
-            | QuickRow::GbBezel => &QuickRow::SCREEN_GB,
+            | QuickRow::GbBezel
+            | QuickRow::GbScale
+            | QuickRow::GbStretch => &QuickRow::SCREEN_GB,
             QuickRow::FastForward
             | QuickRow::FastForwardSound
             | QuickRow::Rewind
@@ -408,8 +491,10 @@ impl QuickRow {
             QuickRow::Resume
             | QuickRow::UndoSave
             | QuickRow::UndoLoad
+            | QuickRow::UndoReset
             | QuickRow::States
             | QuickRow::Screenshots
+            | QuickRow::Guide
             | QuickRow::Settings
             | QuickRow::ExitGame => &QuickRow::PLAY,
             QuickRow::PlayScreen | QuickRow::PlayGameplay | QuickRow::PlayControls => {
@@ -418,9 +503,13 @@ impl QuickRow {
             r if r.game_button().is_some() => &QuickRow::CONTROLS,
             r if r.shortcut().is_some() => &QuickRow::SHORTCUTS,
             r if r.carousel_action().is_some() => &QuickRow::SHELF_KEYS,
-            QuickRow::Shader | QuickRow::ColourCorrection | QuickRow::Palette | QuickRow::Bezel => {
-                &QuickRow::PLAY_SCREEN
-            }
+            QuickRow::Shader
+            | QuickRow::ColourCorrection
+            | QuickRow::Palette
+            | QuickRow::Bezel
+            | QuickRow::Scale
+            | QuickRow::Stretch
+            | QuickRow::Blending => &QuickRow::PLAY_SCREEN,
             _ => &QuickRow::MAIN,
         }
     }
@@ -513,6 +602,8 @@ impl QuickRow {
             QuickRow::ScreenGeneral => "General",
             QuickRow::Brightness | QuickRow::PlayBrightness => "Brightness",
             QuickRow::BlueLight | QuickRow::PlayBlueLight => "Blue Light",
+            QuickRow::Saturation | QuickRow::PlaySaturation => "Saturation",
+            QuickRow::Contrast | QuickRow::PlayContrast => "Contrast",
             QuickRow::DateTime => "Date & Time",
             QuickRow::About => "About",
             QuickRow::GbaShader => "Shader",
@@ -535,8 +626,10 @@ impl QuickRow {
             QuickRow::Resume => "Resume",
             QuickRow::UndoSave => "Undo Save",
             QuickRow::UndoLoad => "Undo Load",
+            QuickRow::UndoReset => "Undo Reset",
             QuickRow::States => "States",
             QuickRow::Screenshots => "Screenshots",
+            QuickRow::Guide => "Guide",
             QuickRow::Settings => "Settings",
             QuickRow::ExitGame => "Exit Game",
             QuickRow::General => "General",
@@ -571,7 +664,12 @@ impl QuickRow {
             | QuickRow::ScShaderNext
             | QuickRow::ScShaderBack
             | QuickRow::ScFastForward
-            | QuickRow::ScRewind => self.shortcut().map_or("", Shortcut::label),
+            | QuickRow::ScFastForwardToggle
+            | QuickRow::ScRewind
+            | QuickRow::ScSunlightUp
+            | QuickRow::ScSunlightDown
+            | QuickRow::ScReset
+            | QuickRow::ScGuide => self.shortcut().map_or("", Shortcut::label),
             QuickRow::ShelfPrev | QuickRow::ShelfNext | QuickRow::ShelfFavorite => {
                 self.carousel_action().map_or("", CarouselAction::label)
             }
@@ -585,6 +683,14 @@ impl QuickRow {
             QuickRow::ScreenGb => "Game Boy",
             QuickRow::GbBezel => "Bezel",
             QuickRow::GbcBezel => "Bezel",
+            QuickRow::GbaScale | QuickRow::GbScale | QuickRow::GbcScale | QuickRow::Scale => {
+                "Scale"
+            }
+            QuickRow::GbStretch | QuickRow::GbcStretch | QuickRow::Stretch => "Stretch",
+            QuickRow::GbaBlending
+            | QuickRow::GbcBlending
+            | QuickRow::GbBlending
+            | QuickRow::Blending => "Frame Blending",
             QuickRow::GbaBezel => "Bezel",
             QuickRow::Bezel => "Bezel",
             QuickRow::XmbTheme => "Theme Settings",
@@ -612,8 +718,10 @@ impl QuickRow {
                 | QuickRow::Resume
                 | QuickRow::UndoSave
                 | QuickRow::UndoLoad
+                | QuickRow::UndoReset
                 | QuickRow::States
                 | QuickRow::Screenshots
+                | QuickRow::Guide
                 | QuickRow::Settings
                 | QuickRow::ExitGame
                 | QuickRow::PlayScreen
@@ -667,7 +775,12 @@ impl QuickRow {
             QuickRow::ScShaderNext => Shortcut::ShaderNext,
             QuickRow::ScShaderBack => Shortcut::ShaderBack,
             QuickRow::ScFastForward => Shortcut::FastForward,
+            QuickRow::ScFastForwardToggle => Shortcut::FastForwardToggle,
             QuickRow::ScRewind => Shortcut::Rewind,
+            QuickRow::ScSunlightUp => Shortcut::SunlightUp,
+            QuickRow::ScSunlightDown => Shortcut::SunlightDown,
+            QuickRow::ScReset => Shortcut::Reset,
+            QuickRow::ScGuide => Shortcut::Guide,
             _ => return None,
         })
     }
@@ -700,6 +813,7 @@ impl QuickRow {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum QuickValue {
+    Speed1_5,
     Speed2,
     Speed3,
     Speed4,
@@ -710,6 +824,7 @@ pub enum QuickValue {
     Grid,
     Dot,
     Simpletex,
+    Shimmerless,
     Dark,
     Light,
     Show,
@@ -733,10 +848,18 @@ pub enum QuickValue {
     Level7,
     Level8,
     Level9,
+    SpFrame,
+    Integer,
+    Fit,
+    Classic,
+    FullScreen,
+    Mix,
+    Ghosting,
 }
 
 impl QuickValue {
-    pub const ALL: [QuickValue; 33] = [
+    pub const ALL: [QuickValue; 42] = [
+        QuickValue::Speed1_5,
         QuickValue::Speed2,
         QuickValue::Speed3,
         QuickValue::Speed4,
@@ -747,6 +870,7 @@ impl QuickValue {
         QuickValue::Grid,
         QuickValue::Dot,
         QuickValue::Simpletex,
+        QuickValue::Shimmerless,
         QuickValue::Dark,
         QuickValue::Light,
         QuickValue::Show,
@@ -770,6 +894,13 @@ impl QuickValue {
         QuickValue::Level7,
         QuickValue::Level8,
         QuickValue::Level9,
+        QuickValue::SpFrame,
+        QuickValue::Integer,
+        QuickValue::Fit,
+        QuickValue::Classic,
+        QuickValue::FullScreen,
+        QuickValue::Mix,
+        QuickValue::Ghosting,
     ];
 
     pub const LEVELS: [QuickValue; 10] = [
@@ -800,6 +931,7 @@ impl QuickValue {
 
     pub fn text(self) -> &'static str {
         match self {
+            QuickValue::Speed1_5 => "1.5×",
             QuickValue::Speed2 => "2×",
             QuickValue::Speed3 => "3×",
             QuickValue::Speed4 => "4×",
@@ -810,6 +942,7 @@ impl QuickValue {
             QuickValue::Grid => "Grid",
             QuickValue::Dot => "Dot",
             QuickValue::Simpletex => "Simpletex",
+            QuickValue::Shimmerless => "Shimmerless",
             QuickValue::Dark => "Dark",
             QuickValue::Light => "Light",
             QuickValue::Show => "Show",
@@ -833,6 +966,13 @@ impl QuickValue {
             QuickValue::Level7 => "7",
             QuickValue::Level8 => "8",
             QuickValue::Level9 => "9",
+            QuickValue::SpFrame => "SP Screen",
+            QuickValue::Integer => "Integer",
+            QuickValue::Fit => "Fit",
+            QuickValue::Classic => "Classic",
+            QuickValue::FullScreen => "Full Screen",
+            QuickValue::Mix => "Mix",
+            QuickValue::Ghosting => "Ghosting",
         }
     }
 
@@ -840,13 +980,14 @@ impl QuickValue {
         QuickValue::LEVELS[usize::from(n).min(QuickValue::LEVELS.len() - 1)]
     }
 
-    pub fn speed(frames: u8) -> Option<QuickValue> {
-        match frames {
+    pub fn speed(quarters: u8) -> Option<QuickValue> {
+        match quarters {
             0 => Some(QuickValue::Off),
-            2 => Some(QuickValue::Speed2),
-            3 => Some(QuickValue::Speed3),
-            4 => Some(QuickValue::Speed4),
-            6 => Some(QuickValue::Speed6),
+            6 => Some(QuickValue::Speed1_5),
+            8 => Some(QuickValue::Speed2),
+            12 => Some(QuickValue::Speed3),
+            16 => Some(QuickValue::Speed4),
+            24 => Some(QuickValue::Speed6),
             _ => None,
         }
     }
@@ -874,20 +1015,20 @@ impl QuickValue {
 
 pub const QUICK_PITCH: f32 = 52.0;
 pub const QUICK_EDGE: f32 = 32.0;
-pub const QUICK_LABEL_X: f32 = 64.0;
-const POINTER_GAP: f32 = 14.0;
-const POINTER_SCALE: usize = 4;
+pub const QUICK_LABEL_X: f32 = 53.0;
+pub const QUICK_VALUE_GAP: f32 = 24.0;
+const VALUE_MIN_SCALE: f32 = 0.6;
+pub(crate) const POINTER_GAP: f32 = 17.0;
+const POINTER_SCALE: usize = 3;
 const POINTER: [&str; 11] = [
-    "X.......", "XX......", "XoX.....", "XooX....", "XoooX...", "XooooX..", "XoooX...", "XooX....",
-    "XoX.....", "XX......", "X.......",
+    "X.....", "XX....", "XoX...", "XooX..", "XoooX.", "XooooX", "XoooX.", "XooX..", "XoX...",
+    "XX....", "X.....",
 ];
-const POINTER_BLEED: u32 = 4;
+pub(crate) const POINTER_BLEED: u32 = 4;
 const GROUND_SCRIM: f32 = 0.65;
-const TYPE_DROP: f32 = 4.0;
-const CARET_GAP: f32 = 14.0;
-const CARET_PX: f32 = 24.0;
-const LEGEND_Y: f32 = 427.0;
-const DIM_INK: [u8; 3] = [0x9a, 0x9a, 0xa4];
+pub(crate) const TYPE_DROP: f32 = 4.0;
+pub(crate) const LEGEND_Y: f32 = 427.0;
+pub(crate) const DIM_INK: [u8; 3] = [0x9a, 0x9a, 0xa4];
 const DESCRIPTION_PX: f32 = 16.0;
 const DESCRIPTION_GAP: f32 = 8.0;
 const PANEL_GAP: f32 = 12.0;
@@ -978,7 +1119,7 @@ pub fn quick_warning_value_face(text: &str, lit: bool) -> UndoFace {
     UndoFace { rgba, w, h }
 }
 
-fn quick_text_face(label: &str, colour: [u8; 3]) -> UndoFace {
+pub(crate) fn quick_text_face(label: &str, colour: [u8; 3]) -> UndoFace {
     let Some(font) = text::label_font() else {
         return UndoFace {
             rgba: Vec::new(),
@@ -996,34 +1137,6 @@ fn quick_text_face(label: &str, colour: [u8; 3]) -> UndoFace {
     let mut rgba = vec![0u8; (w * MENU_H * 4) as usize];
     text::draw_centred(&mut rgba, w, MENU_H, &layout, colour);
     UndoFace { rgba, w, h: MENU_H }
-}
-
-pub fn quick_caret_face(right: bool) -> UndoFace {
-    let glyph = if right { '\u{f0da}' } else { '\u{f0d9}' };
-    let (Some(symbols), Some(label)) = (crate::icon::symbols_font(), text::label_font()) else {
-        return UndoFace {
-            rgba: Vec::new(),
-            w: 0,
-            h: 0,
-        };
-    };
-    let (m, cov) = symbols.rasterize(glyph, CARET_PX);
-    let (w, h) = (m.width as u32, MENU_H);
-    let centre = cap_centre(label, h);
-    let top = (centre - m.height as f32 / 2.0).round() as i32;
-    let mut rgba = vec![0u8; (w * h * 4) as usize];
-    for gy in 0..m.height {
-        let y = top + gy as i32;
-        if y < 0 || y >= h as i32 {
-            continue;
-        }
-        for gx in 0..m.width {
-            let at = ((y as u32 * w + gx as u32) * 4) as usize;
-            let a = cov[gy * m.width + gx];
-            rgba[at..at + 4].copy_from_slice(&[MENU_INK[0], MENU_INK[1], MENU_INK[2], a]);
-        }
-    }
-    UndoFace { rgba, w, h }
 }
 
 pub fn quick_legend_faces(ink: [u8; 3]) -> [UndoFace; 8] {
@@ -1116,6 +1229,23 @@ pub fn link_button_legends(ink: [u8; 3]) -> Vec<UndoFace> {
     ]
 }
 
+pub fn clock_legend_faces(ink: [u8; 3]) -> [UndoFace; 6] {
+    let hint = Some(ink);
+    [
+        with_hint(button_face(ButtonLegend::A), "Done", hint, false),
+        with_hint(up_down_pair(), "Change", hint, false),
+        with_hint(
+            button_pair(ButtonLegend::Left, ButtonLegend::Right),
+            "Page",
+            hint,
+            false,
+        ),
+        with_hint(button_face(ButtonLegend::A), "Change", hint, false),
+        with_hint(button_face(ButtonLegend::A), "Select", hint, false),
+        with_hint(button_face(ButtonLegend::B), "Done", hint, true),
+    ]
+}
+
 pub fn repair_legends(ink: [u8; 3]) -> [UndoFace; 2] {
     prompt_legends(ink, "Not now", "Repair")
 }
@@ -1155,7 +1285,7 @@ fn with_hint(button: UndoFace, label: &str, ink: Option<[u8; 3]>, hint_on_right:
     UndoFace { rgba, w, h }
 }
 
-fn button_face(which: ButtonLegend) -> UndoFace {
+pub(crate) fn button_face(which: ButtonLegend) -> UndoFace {
     let (rgba, w, h) = button_legend(which);
     UndoFace {
         rgba: rgba.to_vec(),
@@ -1164,13 +1294,97 @@ fn button_face(which: ButtonLegend) -> UndoFace {
     }
 }
 
-fn button_pair(left: ButtonLegend, right: ButtonLegend) -> UndoFace {
+const ARROW_EDGE: u32 = 480;
+
+pub(crate) fn up_down_pair() -> UndoFace {
+    let (left, lw, lh) = button_legend(ButtonLegend::Left);
+    let (right, rw, rh) = button_legend(ButtonLegend::Right);
+    join(
+        (&arrow_turned(left, lw, lh), lw, lh),
+        (&arrow_turned(right, rw, rh), rw, rh),
+    )
+}
+
+fn arrow_turned(px: &[u8], w: u32, h: u32) -> Vec<u8> {
+    let (w, h) = (w as usize, h as usize);
+    let margin = h / 5;
+    let ink = |x: usize, y: usize| {
+        let at = (y * w + x) * 4;
+        match px[at + 3] {
+            255 => px[at..at + 3].iter().map(|&c| c as u32).sum::<u32>(),
+            _ => u32::MAX,
+        }
+    };
+    let seed = (margin..h - margin)
+        .flat_map(|y| (margin..w - margin).map(move |x| (x, y)))
+        .min_by_key(|&(x, y)| ink(x, y));
+    let mut arrow = Vec::new();
+    let mut seen = vec![false; w * h];
+    let mut todo: Vec<(usize, usize)> = seed.into_iter().collect();
+    while let Some((x, y)) = todo.pop() {
+        if x >= w || y >= h || seen[y * w + x] || ink(x, y) > ARROW_EDGE {
+            continue;
+        }
+        seen[y * w + x] = true;
+        arrow.push((x, y));
+        todo.extend([
+            (x + 1, y),
+            (x.wrapping_sub(1), y),
+            (x, y + 1),
+            (x, y.wrapping_sub(1)),
+        ]);
+    }
+    let mut out = px.to_vec();
+    let (Some(x0), Some(x1), Some(y0), Some(y1)) = (
+        arrow.iter().map(|p| p.0).min(),
+        arrow.iter().map(|p| p.0).max(),
+        arrow.iter().map(|p| p.1).min(),
+        arrow.iter().map(|p| p.1).max(),
+    ) else {
+        return out;
+    };
+    let side = (x1 - x0).max(y1 - y0) + 3;
+    let (left, top) = ((x0 + x1 - side) / 2, (y0 + y1 - side) / 2);
+    for y in 0..side {
+        for x in 0..side {
+            let from = ((top + side - 1 - x) * w + left + y) * 4;
+            let to = ((top + y) * w + left + x) * 4;
+            out[to..to + 4].copy_from_slice(&px[from..from + 4]);
+        }
+    }
+    out
+}
+
+pub(crate) fn button_pair(left: ButtonLegend, right: ButtonLegend) -> UndoFace {
     let (a, aw, ah) = button_legend(left);
     let (b, bw, bh) = button_legend(right);
-    let (w, h) = (aw + bw, ah.max(bh));
+    join((a, aw, ah), (b, bw, bh))
+}
+
+fn join((a, aw, ah): (&[u8], u32, u32), (b, bw, bh): (&[u8], u32, u32)) -> UndoFace {
+    let opaque =
+        |px: &[u8], w: u32, h: u32, x: u32| px[(((h / 2) * w + x) * 4 + 3) as usize] == 255;
+    let keep_a = (0..aw)
+        .rev()
+        .find(|&x| opaque(a, aw, ah, x))
+        .map_or(aw, |x| x + 1);
+    let skip_b = (0..bw).find(|&x| opaque(b, bw, bh, x)).unwrap_or(0);
+    let (w, h) = (keep_a + bw - skip_b, ah.max(bh));
     let mut rgba = vec![0u8; (w * h * 4) as usize];
-    blit(&mut rgba, w, a, aw, ah, 0, 0);
-    blit(&mut rgba, w, b, bw, bh, aw, 0);
+    for y in 0..h {
+        let row = (y * w * 4) as usize;
+        if y < ah {
+            let from = (y * aw * 4) as usize;
+            rgba[row..row + (keep_a * 4) as usize]
+                .copy_from_slice(&a[from..from + (keep_a * 4) as usize]);
+        }
+        if y < bh {
+            let from = ((y * bw + skip_b) * 4) as usize;
+            let to = row + (keep_a * 4) as usize;
+            let n = ((bw - skip_b) * 4) as usize;
+            rgba[to..to + n].copy_from_slice(&b[from..from + n]);
+        }
+    }
     UndoFace { rgba, w, h }
 }
 
@@ -1180,7 +1394,6 @@ pub struct QuickMenuFaces {
     pub labels: Vec<[(TexId, u32, u32); 2]>,
     pub pointer: (TexId, u32, u32),
     pub values: Vec<[(TexId, u32, u32); 2]>,
-    pub carets: [(TexId, u32, u32); 2],
     pub legend: [(TexId, u32); 8],
     pub legend_light: [(TexId, u32); 8],
     pub descriptions: [(TexId, u32, u32); 2],
@@ -1245,11 +1458,13 @@ impl QuickMenu<'_> {
         for row in shown.into_iter().skip(start).take(len) {
             let y = quick_row_top_at(row, self.row, self.hidden) + TYPE_DROP;
             let lit = row == self.row;
+            let mut label_end = QUICK_LABEL_X;
             if let Some(&(tex, w, h)) = faces.labels.get(row.index()).map(|l| &l[lit as usize]) {
                 let x = match row.centred() {
                     true => self.canvas.centred(main_w as f32),
                     false => QUICK_LABEL_X - pad,
                 };
+                label_end = x + w as f32 - pad;
                 push(out, tex, x, y, w, h);
                 if lit {
                     let (tex, pw, ph) = faces.pointer;
@@ -1276,16 +1491,17 @@ impl QuickMenu<'_> {
             let Some((tex, w, h)) = value else {
                 continue;
             };
-            if !lit || row.opens() || row.binds() {
-                push(out, tex, right + pad - w as f32, y, w, h);
-                continue;
-            }
-            let [(left_tex, lw, lh), (right_tex, rw, rh)] = faces.carets;
-            let rx = right - rw as f32;
-            push(out, right_tex, rx, y, rw, rh);
-            let vx = rx - CARET_GAP + pad - w as f32;
-            push(out, tex, vx, y, w, h);
-            push(out, left_tex, vx + pad - CARET_GAP - lw as f32, y, lw, lh);
+            let room = right - label_end - QUICK_VALUE_GAP;
+            let s = (room / (w as f32 - 2.0 * pad)).clamp(VALUE_MIN_SCALE, 1.0);
+            let (sw, sh) = (w as f32 * s, h as f32 * s);
+            out.push(Draw::Tex {
+                x: (right - (w as f32 - pad) * s).round(),
+                y: (y + (h as f32 - sh) / 2.0).round(),
+                w: sw,
+                h: sh,
+                tex,
+                alpha: 1.0,
+            });
         }
         if let Some(bar) = quick_scroll(self.row, self.hidden) {
             let x = self.canvas.w - SCROLL_INSET - SCROLL_W;

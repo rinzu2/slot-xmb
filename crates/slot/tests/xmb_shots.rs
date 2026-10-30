@@ -663,10 +663,10 @@ fn wallpaper_clock_and_levels() {
     assert_eq!(a.quick_menu(), Some(QuickRow::XmbSetClock));
     soft.shot(&mut a, "17_clock_settings");
     press(&mut a, Btn::A);
-    assert!(a.picker().is_some());
+    assert!(a.xmb_clock_picker().is_some());
     // Month first: right moves to the day.
     press(&mut a, Btn::Right);
-    assert_eq!(a.picker().map(|p| p.cursor()), Some(slot_ui::Field::Day));
+    assert_eq!(a.xmb_clock_picker().map(|p| p.cursor()), Some(slot_ui::XmbClockField::Day));
     soft.shot(&mut a, "18_clock_edit");
     press(&mut a, Btn::B);
     assert_eq!(a.quick_menu(), Some(QuickRow::XmbSetClock));
@@ -920,7 +920,7 @@ fn the_dark_pause_menu_can_be_turned_off() {
 
 /// A clock offset that puts the bar's local time at `hour`, so that Modern's day shows the same
 /// whenever the test runs.
-fn offset_for(hour: i64) -> i16 {
+fn offset_for(hour: i64) -> slot_store::Zone {
     let utc = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
@@ -933,7 +933,8 @@ fn offset_for(hour: i64) -> i16 {
     while off < -12 * 60 {
         off += 24 * 60;
     }
-    off as i16
+    // The city whose clock reads closest to it.
+    slot_store::Zone::for_offset(off, utc)
 }
 
 #[test]
@@ -949,7 +950,7 @@ fn modern_waves_on_the_bar() {
         let (_d, mut a, mut soft) = home(SlotState {
             xmb_wave: 3,
             xmb_colour: colour,
-            utc_offset_min: day,
+            zone: day,
             ..SlotState::default()
         });
         assert_eq!(a.xmb_wave_style(), slot_gfx::STYLE_MODERN);
@@ -963,7 +964,7 @@ fn modern_waves_on_the_bar() {
     // Night, by the month.
     let (_d, mut n, mut soft) = home(SlotState {
         xmb_wave: 3,
-        utc_offset_min: offset_for(23),
+        zone: offset_for(23),
         ..SlotState::default()
     });
     soft.settle(&mut n, 120);
@@ -975,7 +976,7 @@ fn modern_waves_on_the_bar() {
 fn a_theme_lists_modern() {
     let (_d, mut a, mut soft) = home(SlotState {
         xmb_wave: 1,
-        utc_offset_min: offset_for(13),
+        zone: offset_for(13),
         ..SlotState::default()
     });
     a.apply(Action::QuickMenu);
@@ -1001,7 +1002,7 @@ fn a_theme_lists_modern() {
 fn modern_starts_from_the_boot_picture_and_switches_off_into_the_dark() {
     let (_d, mut a, mut soft) = home_starting(SlotState {
         xmb_wave: 3,
-        utc_offset_min: offset_for(13),
+        zone: offset_for(13),
         ..SlotState::default()
     });
     let start = a.now() + 10;
@@ -1012,7 +1013,7 @@ fn modern_starts_from_the_boot_picture_and_switches_off_into_the_dark() {
     }
     let (_d2, mut o, mut soft2) = home(SlotState {
         xmb_wave: 3,
-        utc_offset_min: offset_for(13),
+        zone: offset_for(13),
         ..SlotState::default()
     });
     soft2.settle(&mut o, 120);
@@ -1038,7 +1039,7 @@ fn modern_goes_dark_behind_a_paused_game() {
             clock_set: true,
             xmb_wave: 3,
             xmb_colour: 20,
-            utc_offset_min: offset_for(13),
+            zone: offset_for(13),
             ..SlotState::default()
         },
     )

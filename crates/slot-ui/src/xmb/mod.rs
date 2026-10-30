@@ -4,6 +4,8 @@
 //! Everything is drawn from original shapes, an open-licensed font and a procedural background.
 
 mod art;
+mod clock;
+pub use clock::{XmbClockField, XmbClockPicker};
 mod ground;
 mod intro;
 pub mod modern;

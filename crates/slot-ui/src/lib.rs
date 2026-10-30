@@ -13,18 +13,19 @@ mod cart;
 mod clock;
 mod draw;
 mod footer;
+mod guide;
 mod hud;
 mod icon;
 mod link_art;
 mod plate;
 mod polaroids;
-mod shot_viewer;
 mod power_menu;
 mod quick_menu;
 mod rebuild;
 mod refusal;
 mod shelf;
 mod shell;
+mod shot_viewer;
 mod silhouette;
 mod slot_chrome;
 mod sticker;
@@ -32,9 +33,10 @@ pub mod text;
 mod toast;
 mod xmb;
 
+pub use art::decode as decode_png;
 pub use backdrop::{
     bezel_face, blur_background, default_background, default_game_bezel_face, draw_backdrop,
-    draw_ground, game_bezel_face, wallpaper_face,
+    draw_ground, game_bezel_face, wallpaper_face, BezelArt,
 };
 pub use barcode::{code39, CODE39_NARROW, CODE39_WIDE};
 pub use battery::{draw_gauge, BOLT_PX, GAUGE_H, GAUGE_W, WALL};
@@ -52,9 +54,16 @@ pub use cart::{
     GBC_LABEL_H, GBC_LABEL_W, GBC_LABEL_X, GBC_LABEL_Y, GB_CART_H, GB_CART_W, GB_LABEL_H,
     GB_LABEL_W, GB_LABEL_X, GB_LABEL_Y, LABEL_H, LABEL_W, LABEL_WELL, LABEL_X, LABEL_Y,
 };
-pub use clock::{clock_label, date_time_text, hhmm, set_clock_hint_face, ClockPicker, Field};
+pub use clock::{
+    clock_label, date_time_text, hhmm, time_text, ClockFaceSet, ClockFaces,
+    ClockPicker, ClockRow, ClockScreen, Part,
+};
 pub use draw::{Canvas, Draw, TexId, OUT_H, OUT_W};
 pub use footer::{draw_corners, draw_footer, Printed, FOOTER_Y};
+pub use guide::{
+    cell, fitting_zoom, guide_help_face, mono_font, page_box, Guide, GuideGlyphs, GuideView,
+    GUIDE_COLUMNS, GUIDE_HELP_TITLE, GUIDE_HINTS, GUIDE_ZOOMS, PAN_COLS,
+};
 pub use hud::{
     badge_at, ff_badge, footer_ink, FfState, Hud, HudKind, LinkBadge, Millis, ALARM_BAND_H,
     HUD_ICON_PX, HUD_INK, HUD_MS, LINK_HOST_INK, LINK_JOIN_INK, PLATE_H,
@@ -66,24 +75,19 @@ pub use link_art::{
     PLUG_TIP_X, PLUG_W, PORT_H, PORT_W, PORT_Y,
 };
 pub use plate::{
-    arrows_hint_coloured, arrows_hint_face, arrows_hint_width, cap_width, centred_hints, pad_hint_face,
-    pad_hint_width, tick_cap_face,
-    hint_coloured, hint_face, hint_quad, hint_row, hint_width, title_face, title_line_face,
-    word_face, word_ink, word_width, Hint, UndoFace, ARROW_GAP, CAP, CAP_GAP, HINT_EDGE, HINT_GAP,
-    HINT_H, LEGEND_GAP, TITLE_H, TITLE_LINE_H, TITLE_W,
+    arrows_hint_coloured, arrows_hint_face, arrows_hint_width, cap_width, centred_hints,
+    hint_coloured, hint_face, hint_quad, hint_row, hint_width, pad_hint_face, pad_hint_width,
+    tick_cap_face, title_face, title_line_face, word_face, word_ink, word_width, Hint, UndoFace,
+    ARROW_GAP, CAP, CAP_GAP, HINT_EDGE, HINT_GAP, HINT_H, LEGEND_GAP, TITLE_H, TITLE_LINE_H,
+    TITLE_W,
 };
 pub use polaroids::{
     draw_album_chrome, photo_face, AlbumChrome, PhotoFace, Polaroids, DOT, LEGEND, PHOTO_H, PHOTO_W,
 };
-pub use art::decode as decode_png;
-pub use shot_viewer::{
-    grid_cell, grid_rows_shown, thumbnail, ShotMode, ShotViewer, GRID_COLS, GRID_GAP, MAX_ZOOM, PAN_KEY,
-    PAN_TAP, SHOT_HINTS,
-};
 pub use power_menu::{menu_detail_face, menu_face, PowerChoice, MENU_PAD};
 pub use quick_menu::{
-    core_button_legends, delete_legends, draw_menu_ground, link_button_legends, prompt_legends,
-    quick_caret_face, quick_description_face, quick_label_face, quick_legend_faces,
+    clock_legend_faces, core_button_legends, delete_legends, draw_menu_ground, link_button_legends,
+    prompt_legends, quick_description_face, quick_label_face, quick_legend_faces,
     quick_pointer_face, quick_row_top, quick_row_top_at, quick_scroll, quick_value_face,
     quick_warning_value_face, quick_window, repair_legends, QuickMenu, QuickMenuFaces, QuickRow,
     QuickScroll, QuickValue, QUICK_EDGE, QUICK_LABEL_X, QUICK_PITCH, QUICK_VISIBLE,
@@ -96,10 +100,14 @@ pub use shell::{
     lookup_order_is_exact_then_family_then_default, shell_for, shell_presets, table_keys, Finish,
     Shell, DEFAULT_SHELL, DMG_SHELL, DUAL_MODE_SHELL, GB_CLEAR_SHELL,
 };
+pub use shot_viewer::{
+    grid_cell, grid_rows_shown, thumbnail, ShotMode, ShotViewer, GRID_COLS, GRID_GAP, MAX_ZOOM,
+    PAN_KEY, PAN_TAP, SHOT_HINTS,
+};
 pub use silhouette::{gb_silhouette, silhouette, GbShell};
 pub use slot_chrome::{
-    draw_empty_slot, draw_plugged_slot, draw_slot_name, draw_slot_title, ease, edge, housing,
-    opening, recess, slot_name_y, SlotChrome, ALERT_PX, LIP_H, MOUTH_H, MOUTH_W,
+    draw_empty_slot, draw_plugged_slot, draw_slot_title, ease, edge, housing, opening, recess,
+    slot_name_y, SlotChrome, ALERT_PX, LIP_H, MOUTH_H, MOUTH_W,
 };
 pub use sticker::{
     draw_sticker, head_rows, sticker_face, sticker_lines, sticker_rect, StickerFields, COPYRIGHT,
@@ -107,6 +115,7 @@ pub use sticker::{
 };
 pub use toast::{toast_box, toast_face, toast_rect, Toast};
 pub use xmb::modern as xmb_modern;
+pub use xmb::{XmbClockField, XmbClockPicker};
 pub use xmb::{
     classic_lines, month_of, original_edges, xmb_backdrop_colours, xmb_backdrop_edges, xmb_pause_colours, xmb_pause_edges, xmb_clock_text, xmb_colour_index, xmb_date_time_text, civil as xmb_civil, XMB_DATE_FORMATS, XMB_TIME_FORMATS,
     xmb_curves,

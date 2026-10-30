@@ -1,7 +1,7 @@
 use crate::backdrop::BackdropPass;
 use crate::modern::{ModernFrame, ModernPass};
 use crate::draw::{Draw, Sprites, TexId};
-use crate::grade::blue_light_gain;
+use crate::grade::{blue_light_gain, contrast_boost, saturation_boost};
 use crate::pipeline::GamePass;
 use crate::quad::Quad;
 use crate::shaders::{BLIT_FRAG, BLIT_VERT, TURN_VERT};
@@ -24,8 +24,12 @@ pub struct Compositor {
     size: (u32, u32),
     blit: gl::types::GLuint,
     u_gain: gl::types::GLint,
+    u_saturation: gl::types::GLint,
+    u_contrast: gl::types::GLint,
     u_blit_uv: gl::types::GLint,
     gain: [f32; 3],
+    saturation: f32,
+    contrast: f32,
     shake: f32,
     window: (u32, u32),
     screen: f32,
@@ -38,6 +42,7 @@ pub struct Compositor {
     modern_failed: bool,
     game_bezel: Option<TexId>,
     sp_frame: bool,
+    game_panel: bool,
     turn: Option<Turn>,
     captured: Option<(u32, u32, Vec<u8>)>,
 }
@@ -69,6 +74,8 @@ impl Compositor {
             gl::UseProgram(blit);
             gl::Uniform1i(crate::gl::uniform_location(blit, "u_tex"), 0);
             let u_gain = crate::gl::uniform_location(blit, "u_gain");
+            let u_saturation = crate::gl::uniform_location(blit, "u_saturation");
+            let u_contrast = crate::gl::uniform_location(blit, "u_contrast");
             let u_blit_uv = crate::gl::uniform_location(blit, "u_uv");
             gl::Uniform4f(u_blit_uv, 0.0, 0.0, 1.0, 1.0);
 
@@ -78,8 +85,12 @@ impl Compositor {
                 size: (OUT_W, OUT_H),
                 blit,
                 u_gain,
+                u_saturation,
+                u_contrast,
                 u_blit_uv,
                 gain: blue_light_gain(0),
+                saturation: saturation_boost(0),
+                contrast: contrast_boost(0),
                 shake: 0.0,
                 window: (OUT_W, OUT_H),
                 screen: 0.0,
@@ -91,6 +102,7 @@ impl Compositor {
                 modern_failed: false,
                 game_bezel: None,
                 sp_frame: true,
+                game_panel: false,
                 turn: None,
                 captured: None,
             })
@@ -218,6 +230,14 @@ impl Compositor {
         self.gain = blue_light_gain(step);
     }
 
+    pub fn set_saturation(&mut self, step: u8) {
+        self.saturation = saturation_boost(step);
+    }
+
+    pub fn set_contrast(&mut self, step: u8) {
+        self.contrast = contrast_boost(step);
+    }
+
     pub fn set_screen_effect(&mut self, effect: crate::ScreenEffect) {
         self.game.set_effect(effect);
     }
@@ -232,6 +252,11 @@ impl Compositor {
 
     pub fn set_sp_frame(&mut self, on: bool) {
         self.sp_frame = on;
+    }
+
+    pub fn set_game_layout(&mut self, layout: crate::GameLayout) {
+        self.game_panel = layout.panel;
+        self.game.set_layout(layout.rect);
     }
 
     fn draw_game_bezel(&mut self) {
@@ -459,6 +484,8 @@ impl Compositor {
             gl::UseProgram(self.blit);
             gl::ActiveTexture(gl::TEXTURE0);
             gl::Uniform3f(self.u_gain, self.gain[0], self.gain[1], self.gain[2]);
+            gl::Uniform1f(self.u_saturation, self.saturation);
+            gl::Uniform1f(self.u_contrast, self.contrast);
             gl::BindTexture(gl::TEXTURE_2D, self.tex);
         }
         if self.native() {
@@ -498,7 +525,10 @@ impl Compositor {
         if !self.native() {
             return draw(self);
         }
-        let (x, top, w, h) = crate::bezel::game_rect(self.window, self.sp_frame);
+        let (x, top, w, h) = match self.game_panel {
+            true => (0, 0, self.window.0 as i32, self.window.1 as i32),
+            false => crate::bezel::game_rect(self.window, self.sp_frame),
+        };
         self.game
             .set_fbo_scale(w as f32 / OUT_W as f32, h as f32 / OUT_H as f32);
         let y = self.size.1 as i32 - top - h;
