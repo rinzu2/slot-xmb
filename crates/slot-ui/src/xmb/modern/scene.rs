@@ -286,8 +286,6 @@ pub struct Scene {
     /// A change of set on its way: when it started, and how long it takes.
     fade: Option<(f64, f64)>,
     applied: Option<Goal>,
-    /// The scene's time when it was last applied.
-    now: f64,
 }
 
 impl Scene {
@@ -305,7 +303,6 @@ impl Scene {
             boot: None,
             fade: None,
             applied: None,
-            now: 0.0,
         }
     }
 
@@ -318,15 +315,7 @@ impl Scene {
 
     /// Whether the XMB's start is playing.
     pub fn booting(&self) -> bool {
-        self.boot.is_some_and(|(start, _)| self.now < Self::boot_end(start))
-    }
-
-    /// When the start's last step, the day's set coming in, is over. The console cuts it short
-    /// when it lets go of the clock, bringing the rest in over a second; here it runs its course,
-    /// so that the colours come up in one smooth sweep.
-    fn tail_end(start: f64) -> f64 {
-        let last = COLDBOOT[COLDBOOT.len() - 1];
-        start + last.at + last.seconds
+        self.boot.is_some()
     }
 
     /// When the start ends: on the scene clock's first tick once ShowGUI has let go of it.
@@ -343,12 +332,10 @@ impl Scene {
     /// eases in from where the parameters stood, on qgl_base's smoothstep.
     pub fn apply(&mut self, now: f64, hour: f64, p: &mut ParticleSettings, w: &mut WaveSettings) {
         let theme = day_cycle(hour);
-        self.now = now;
         if let Some((start, _)) = self.boot {
-            if now >= Self::tail_end(start) {
+            if now >= Self::boot_end(start) {
                 self.boot = None;
-                self.fade = None;
-                self.applied = None;
+                self.start_fade(now, TICK, p, w);
             }
         }
         if let Some((start, mut step)) = self.boot {
@@ -381,6 +368,13 @@ impl Scene {
         if k >= 1.0 {
             self.fade = None;
         }
+    }
+
+    fn start_fade(&mut self, now: f64, seconds: f64, p: &ParticleSettings, w: &WaveSettings) {
+        self.particles.mark(p);
+        self.wave.mark(w);
+        self.fade = Some((now, seconds));
+        self.applied = None;
     }
 
     fn write_step(&self, step: &Step, theme: Goal, t: f64, p: &mut ParticleSettings, w: &mut WaveSettings) {

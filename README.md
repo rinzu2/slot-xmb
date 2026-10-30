@@ -69,7 +69,7 @@ Everything here is built behind a `xmb` cargo feature. Without that feature, slo
 - On power-up the screen shows a boot picture that reads "slot. XMB".
 - The start-up animation takes over from that picture without a jump. The lines brighten, colour spreads out from them, and the waves grow out of them.
 - Games and settings load while the animation plays. If loading takes longer, the waves stay up with a pulsing ring at the lower left.
-- With Modern, the PS3's own start-up plays instead: from black, its wave rises through the boot picture's lines and the colour comes up behind it.
+- With Modern, the PS3's own start-up plays instead: its wave appears lying along the boot picture's lines, unfolds into its own shape as they fade, and the colour comes up behind it.
 - Switching off plays the animation in reverse.
 - Booting straight back into a game you left running skips the animation and goes from the boot picture to the game.
 

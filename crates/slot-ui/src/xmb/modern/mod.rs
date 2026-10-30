@@ -28,7 +28,7 @@ use slot_gfx::{
 
 use months::{month_texels, DAY, NIGHT};
 use particles::{SimOptions, System, LIFE_MAX, LIFE_MIN, OUT_STRIDE};
-use scene::{Scene, BOOT_EASE, TICK};
+use scene::{Scene, BOOT_EASE, BOOT_HOUR, TICK};
 use settings::{ParticleSettings, WaveSettings};
 use wave::{Wave, CAMERA};
 
@@ -58,8 +58,14 @@ pub enum ModernColour {
     Picture(Vec<u8>),
 }
 
-/// How long the wave takes to come up out of the dark as the XMB's start begins.
-const BOOT_RISE: f64 = 2.8;
+/// Where the boot picture's lines run, as a share of the screen's height from its top: the XMB's
+/// start lays its wave flat along them and lets it unfold into its own shape as they fade.
+const SPLASH_LINE: f64 = 0.49;
+/// How flat the wave lies along them at first, as a share of its own height.
+const SPLASH_FLAT: f64 = 0.12;
+/// Seconds into the start that the unfolding begins and how long it takes.
+const UNFOLD_FROM: f64 = 0.35;
+const UNFOLD_SECS: f64 = 1.5;
 
 /// A moment handed to the backdrop: the month (0 to 11), its day, the hour, and how long it eases in.
 #[derive(Clone, Copy, Debug)]
@@ -112,7 +118,7 @@ pub struct ModernScene {
     /// so that between times it stands still and is not drawn again.
     minute: Option<(usize, u32, i64)>,
     boot_handed: bool,
-    /// When the XMB's start began, for the wave's rise out of the dark.
+    /// When the XMB's start began, for the wave's unfolding from the boot picture's lines.
     boot_at: Option<f64>,
     /// Whether `wave.mesh` holds a surface `frame_into` has not yet taken.
     mesh_fresh: bool,
@@ -245,9 +251,8 @@ impl ModernScene {
     }
 
     /// The moment the backdrop is handed: the clock's, a minute at a time while nothing holds the
-    /// clock, or the clock's own as the XMB's start begins, eased in out of black. The hour moves
-    /// the backdrop by far less than a shade in a minute, so it waits for the minute to turn; and
-    /// a long ease, the start's, runs to its end before the clock's next moment takes over.
+    /// clock, or ten in the morning as the XMB's start begins. The hour moves the backdrop by far
+    /// less than a shade in a minute, so it waits for the minute to turn.
     fn hand_backdrop(&mut self, wall: Wall, noon: bool) {
         let tick = self.time.floor() as i64;
         let hour = if noon { 12.0 } else { wall.hour };
@@ -265,22 +270,23 @@ impl ModernScene {
             me.ease = 0.0;
             me.minute = Some(minute);
         };
-        let easing = self.moment.seconds > TICK && self.ease < self.moment.seconds;
         if self.scene.booting() && !self.boot_handed {
             self.boot_handed = true;
             hand(
                 Moment {
+                    hour: BOOT_HOUR,
                     seconds: BOOT_EASE,
                     from_black: true,
                     ..shown
                 },
                 self,
             );
+            // The clock's own moment follows once the start lets go of the clock.
+            self.minute = None;
         } else if self.tick.is_none() {
             hand(Moment { seconds: 0.0, ..shown }, self);
         } else if Some(tick) != self.tick
             && self.minute != Some(minute)
-            && !easing
             && !self.scene.clock_held(self.time)
         {
             hand(shown, self);
@@ -323,17 +329,22 @@ impl ModernScene {
             fresnel: s.fresnel as f32,
             spacing: s.spacing as f32,
             thinness: s.thinness as f32,
+            flat: 0.0,
+            line: 0.0,
         };
         f.post = post_uniforms(s, 1.0);
-        // As the XMB's start begins, the wave and its sparkles rise slowly out of the dark.
-        let rise = self.boot_at.map_or(1.0, |at| {
-            let x = ((self.time - at) / BOOT_RISE).clamp(0.0, 1.0);
-            x * x * x * (x * (6.0 * x - 15.0) + 10.0)
+        f.fade = self.fade as f32;
+        // As the XMB's start begins, the wave lies flat along the boot picture's lines, then
+        // unfolds into its own shape as they fade.
+        let flat = self.boot_at.map_or(0.0, |at| {
+            let x = ((self.time - at - UNFOLD_FROM) / UNFOLD_SECS).clamp(0.0, 1.0);
+            1.0 - x * x * x * (x * (6.0 * x - 15.0) + 10.0)
         });
-        if rise >= 1.0 {
+        if flat <= 0.0 {
             self.boot_at = None;
         }
-        f.fade = (self.fade * rise) as f32;
+        f.wave.flat = (flat * (1.0 - SPLASH_FLAT)) as f32;
+        f.wave.line = (1.0 - 2.0 * SPLASH_LINE) as f32;
         // The backdrop.
         let m = self.moment;
         let want = match &self.colour {

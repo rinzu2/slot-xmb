@@ -1078,3 +1078,4 @@ fn modern_goes_dark_behind_a_paused_game() {
     assert!(a.xmb_calm(), "a paused game's menu, left alone, is calm");
 }
 
+

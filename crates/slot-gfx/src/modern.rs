@@ -37,6 +37,10 @@ pub struct ModernWave {
     pub fresnel: f32,
     pub spacing: f32,
     pub thinness: f32,
+    /// How far the wave is pressed flat about the height `line` (on the screen, 1 at the top and
+    /// -1 at the bottom): 0 not at all, as it is but for the XMB's start.
+    pub flat: f32,
+    pub line: f32,
 }
 
 /// What the passes after the wave read: HDR.mnu's and BACKGROUND.mnu's, worked out as the
@@ -148,6 +152,8 @@ attribute vec2 a_uv;
 uniform float u_mipmap_bias;
 uniform float u_brightness;
 uniform float u_fresnel;
+uniform float u_flat;
+uniform float u_line;
 varying vec2 v_coord;
 varying vec4 v_params;
 void main() {
@@ -157,7 +163,8 @@ void main() {
     float m = abs(dot(e, a_normal.xyz)) * inv_len * u_mipmap_bias;
     v_coord = vec2(a_uv.x, m);
     v_params = vec4(u_fresnel * m, u_brightness * m, abs(dot(e, n)) * m, a_uv.y);
-    gl_Position = a_pos;
+    // Lit as it stands, drawn pressed towards the boot picture's lines while the start lays it there.
+    gl_Position = vec4(a_pos.x, mix(a_pos.y, u_line * a_pos.w, u_flat), a_pos.zw);
 }
 "#;
 
@@ -1060,7 +1067,7 @@ impl ModernPass {
         let wave = Program::new(
             WAVE_VERT,
             WAVE_FRAG,
-            &["u_mipmap_bias", "u_brightness", "u_fresnel", "u_stripes", "u_fres", "u_spacing", "u_thinness"],
+            &["u_mipmap_bias", "u_brightness", "u_fresnel", "u_stripes", "u_fres", "u_spacing", "u_thinness", "u_flat", "u_line"],
         )?;
         let back = Program::new(
             FULL_VERT,
@@ -1462,6 +1469,8 @@ impl ModernPass {
             p.f1("u_fresnel", wv.fresnel);
             p.f1("u_spacing", wv.spacing);
             p.f1("u_thinness", wv.thinness);
+            p.f1("u_flat", wv.flat);
+            p.f1("u_line", wv.line);
             p.i1("u_stripes", 0);
             p.i1("u_fres", 1);
             bind_texture(0, self.stripes);
