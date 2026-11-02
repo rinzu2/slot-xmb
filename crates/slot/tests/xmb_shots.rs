@@ -670,6 +670,26 @@ fn wallpaper_clock_and_levels() {
     press(&mut a, Btn::Right);
     assert_eq!(a.xmb_clock_picker().map(|p| p.cursor()), Some(slot_ui::XmbClockField::Day));
     soft.shot(&mut a, "18_clock_edit");
+    // On past the minutes to the seconds, and on a 12-hour clock to AM or PM.
+    for _ in 0..10 {
+        press(&mut a, Btn::Right);
+    }
+    let last = a.xmb_clock_picker().map(|p| p.cursor());
+    match last == Some(slot_ui::XmbClockField::Meridiem) {
+        true => {
+            let hour = a.xmb_clock_picker().unwrap().hour();
+            press(&mut a, Btn::Up);
+            assert_eq!(a.xmb_clock_picker().unwrap().hour(), (hour + 12) % 24);
+            soft.shot(&mut a, "18b_clock_meridiem");
+            press(&mut a, Btn::Left);
+        }
+        false => assert_eq!(last, Some(slot_ui::XmbClockField::Second)),
+    }
+    assert_eq!(a.xmb_clock_picker().map(|p| p.cursor()), Some(slot_ui::XmbClockField::Second));
+    assert_eq!(a.xmb_clock_picker().unwrap().second(), None);
+    press(&mut a, Btn::Up);
+    assert!(a.xmb_clock_picker().unwrap().second().is_some());
+    soft.shot(&mut a, "18c_clock_seconds");
     press(&mut a, Btn::B);
     assert_eq!(a.quick_menu(), Some(QuickRow::XmbSetClock));
 

@@ -1065,8 +1065,13 @@ impl App {
         else {
             return;
         };
+        // Set seconds set the clock to the second; otherwise the minutes move it and the seconds
+        // run on as they were.
         let (moved, from_menu) = (picker.secs() - *seed, *from_menu);
-        let utc = self.utc_secs() + moved;
+        let utc = match picker.second() {
+            Some(_) => picker.secs(),
+            None => self.utc_secs() + moved,
+        };
         if let Some(power) = &mut self.power {
             power.set_clock(utc);
         }
@@ -3044,12 +3049,12 @@ impl App {
             Action::PowerOff => return,
             _ => {}
         }
-        if let Phase::XmbClock { picker, from_menu, .. } = &mut self.phase {
+        if let Phase::XmbClock { from_menu, .. } = &mut self.phase {
             match action {
                 Action::GbaDown(Btn::Left) | Action::ShelfLeft => self.xmb_clock_move(-1),
                 Action::GbaDown(Btn::Right) | Action::ShelfRight => self.xmb_clock_move(1),
-                Action::GbaDown(Btn::Up) => picker.up(),
-                Action::GbaDown(Btn::Down) => picker.down(),
+                Action::GbaDown(Btn::Up) => self.xmb_clock_step(true),
+                Action::GbaDown(Btn::Down) => self.xmb_clock_step(false),
                 Action::GbaDown(Btn::A) | Action::Insert => self.confirm_xmb_clock(),
                 Action::GbaDown(Btn::B) if *from_menu => {
                     self.phase = Phase::QuickMenu {

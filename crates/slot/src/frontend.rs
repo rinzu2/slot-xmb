@@ -151,6 +151,10 @@ struct XmbSync {
     modern: Option<ModernSync>,
 }
 
+/// How long a frame of the bar waits for Modern's scene before drawing its last frame again: the
+/// scene's thread can fall behind while the handheld is busy, as it is starting up.
+pub const MODERN_PATIENCE: std::time::Duration = std::time::Duration::from_millis(6);
+
 /// The PS3's scene and what it was last told.
 pub struct ModernSync {
     pub scene: slot_ui::xmb_modern::ModernWorker,
@@ -262,7 +266,7 @@ impl ModernSync {
 fn sync_modern(app: &App, compositor: &mut Compositor, xs: &mut XmbSync) {
     let m = xs
         .modern
-        .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None), false));
+        .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None).with_patience(MODERN_PATIENCE), false));
     let began = std::time::Instant::now();
     let frame = m.drive(app, xs.grounds.as_deref());
     let waited = began.elapsed();
@@ -357,7 +361,7 @@ fn sync_xmb(app: &mut App, compositor: &mut Compositor, xs: &mut XmbSync) {
         // made now, so that pausing shows it at once, and the scene rests until then.
         compositor.prepare_modern();
         xs.modern
-            .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None), true))
+            .get_or_insert_with(|| ModernSync::new(slot_ui::xmb_modern::ModernWorker::fresh(None).with_patience(MODERN_PATIENCE), true))
             .sleep();
     } else if let Some(m) = &mut xs.modern {
         m.sleep();

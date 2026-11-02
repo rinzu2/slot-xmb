@@ -374,12 +374,16 @@ impl BootIntro {
         let title = (compositor.create_texture(f.w, f.h, &f.rgba), at);
         let modern = (style == slot_gfx::STYLE_MODERN).then(|| {
             use slot_ui::xmb_modern::{xmb_modern_picture, ModernColour, ModernScene};
-            let mut scene = ModernScene::new(None);
+            // Its start resets the lines, so the scene is not run on first.
+            let mut scene = ModernScene::for_start(None);
             if state.xmb_colour != 0 {
                 let face = slot::xmb_ground::face(&grounds, colour).map(|f| (f.w, f.h, &f.rgba[..]));
                 scene.set_colour(ModernColour::Picture(xmb_modern_picture(colour, face)));
             }
-            (slot_ui::xmb_modern::ModernWorker::new(scene), false)
+            (
+                slot_ui::xmb_modern::ModernWorker::new(scene).with_patience(slot::frontend::MODERN_PATIENCE),
+                false,
+            )
         });
         Some(BootIntro {
             started: Instant::now(),

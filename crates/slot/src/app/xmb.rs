@@ -101,13 +101,32 @@ impl App {
 
     /// The clock's fields in the order the date format reads them, then the time. The zone is
     /// a setting of its own, as on the handheld.
-    pub(super) fn xmb_clock_fields(&self) -> [Field; 5] {
+    pub(super) fn xmb_clock_fields(&self) -> Vec<Field> {
         let date = match self.state.xmb_date_format {
             1 => [Field::Day, Field::Month, Field::Year],
             2 => [Field::Year, Field::Month, Field::Day],
             _ => [Field::Month, Field::Day, Field::Year],
         };
-        [date[0], date[1], date[2], Field::Hour, Field::Minute]
+        let mut fields = vec![date[0], date[1], date[2], Field::Hour, Field::Minute, Field::Second];
+        if !self.state.clock_24h {
+            fields.push(Field::Meridiem);
+        }
+        fields
+    }
+
+    /// Up or down on the clock's field: the seconds start from where the clock's own are.
+    pub(super) fn xmb_clock_step(&mut self, up: bool) {
+        let live = self.wall_secs().rem_euclid(60);
+        let Phase::XmbClock { picker, .. } = &mut self.phase else {
+            return;
+        };
+        if picker.cursor() == Field::Second {
+            picker.hold_second(live);
+        }
+        match up {
+            true => picker.up(),
+            false => picker.down(),
+        }
     }
 
     /// Left and right move along the fields as they read on screen.
@@ -152,10 +171,11 @@ impl App {
         push(":".to_string(), None, &mut parts);
         push(format!("{:02}", picker.minute()), Some(Field::Minute), &mut parts);
         push(":".to_string(), None, &mut parts);
-        push(format!("{:02}", self.wall_secs().rem_euclid(60)), None, &mut parts);
+        let second = picker.second().unwrap_or_else(|| self.wall_secs().rem_euclid(60));
+        push(format!("{second:02}"), Some(Field::Second), &mut parts);
         if !self.state.clock_24h {
             parts.push(None);
-            push(if h < 12 { "AM" } else { "PM" }.to_string(), None, &mut parts);
+            push(if h < 12 { "AM" } else { "PM" }.to_string(), Some(Field::Meridiem), &mut parts);
         }
         (parts, at)
     }

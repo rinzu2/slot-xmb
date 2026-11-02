@@ -139,13 +139,20 @@ pub struct ModernScene {
 impl ModernScene {
     /// A scene already running, as if the bar had been up for a while.
     pub fn new(seed: Option<i32>) -> Self {
-        let mut wave = Wave::new();
+        let mut scene = Self::for_start(seed);
         // Fresh from its start the lines sit in the console's baked state; a few seconds on, they
         // move as the scene's do at rest.
-        let ws = WaveSettings::default();
         for _ in 0..240 {
-            wave.update(&ws, 1.0 / 60.0, 4.0 / 3.0, false);
+            scene.wave.update(&scene.ws, 1.0 / 60.0, 4.0 / 3.0, false);
         }
+        scene
+    }
+
+    /// A scene about to play the XMB's start (`boot`), which starts its lines afresh: it is not
+    /// run on first.
+    pub fn for_start(seed: Option<i32>) -> Self {
+        let wave = Wave::new();
+        let ws = WaveSettings::default();
         let frame = ModernFrame {
             fade: 1.0,
             ..ModernFrame::default()
@@ -669,6 +676,12 @@ pub struct ModernWorker {
     done: std::sync::mpsc::Receiver<ModernFrame>,
     latest: ModernFrame,
     busy: bool,
+    /// How long a frame waits for the scene before drawing the last one again, when it is not to
+    /// wait at all costs: while the handheld is busy (its start-up, say) the scene's thread can
+    /// fall behind, and the bar should not wait on it.
+    patience: Option<std::time::Duration>,
+    /// The time and the moves the scene has not yet been handed, while it was behind.
+    owed: (f64, Vec<usize>),
 }
 
 impl ModernWorker {
@@ -712,7 +725,15 @@ impl ModernWorker {
             done,
             latest: ModernFrame::default(),
             busy: false,
+            patience: None,
+            owed: (0.0, Vec::new()),
         }
+    }
+
+    /// Waits at most `patience` for each frame, drawing the last one again if the scene is behind.
+    pub fn with_patience(mut self, patience: std::time::Duration) -> Self {
+        self.patience = Some(patience);
+        self
     }
 
     /// Starts the XMB's start. The next frame waits for the scene, so that it is the start's
@@ -724,6 +745,7 @@ impl ModernWorker {
             }
             self.busy = false;
         }
+        self.owed = (0.0, Vec::new());
         let _ = self.jobs.send(Job::Boot);
     }
 
@@ -740,6 +762,7 @@ impl ModernWorker {
             }
             self.busy = false;
         }
+        self.owed = (0.0, Vec::new());
     }
 
     /// Takes the frame the scene built from the last call's moves, and sets it off on this one's.
@@ -747,6 +770,7 @@ impl ModernWorker {
     pub fn advance(&mut self, dt: f64, wall: Wall, steps: &[usize], aspect: f64) -> &ModernFrame {
         let mut spare = ModernFrame::default();
         if !self.busy {
+            self.owed = (0.0, Vec::new());
             let first = Job::Advance {
                 dt,
                 wall,
@@ -769,13 +793,25 @@ impl ModernWorker {
             self.busy = self.jobs.send(job).is_ok();
             return &self.latest;
         }
-        if let Ok(f) = self.done.recv() {
+        self.owed.0 += dt;
+        self.owed.1.extend_from_slice(steps);
+        let got = match self.patience {
+            None => self.done.recv().ok(),
+            Some(p) => match self.done.recv_timeout(p) {
+                Ok(f) => Some(f),
+                // Still at work: the last frame is drawn again and this one's time is owed.
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => return &self.latest,
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => None,
+            },
+        };
+        if let Some(f) = got {
             spare = std::mem::replace(&mut self.latest, f);
         }
+        let (dt, steps) = std::mem::take(&mut self.owed);
         let job = Job::Advance {
             dt,
             wall,
-            steps: steps.to_vec(),
+            steps,
             aspect,
             frame: Box::new(spare),
         };
